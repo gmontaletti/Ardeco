@@ -1,0 +1,574 @@
+---
+title: "ARDECO Lombardia"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    theme: cosmo
+    navbar:
+      - { title: "GitHub", href: "https://github.com/gmontaletti", align: right }
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+source("R/helpers.R")
+
+# 1. One-time loads -----
+
+LABELS <- load_labels()
+GEO    <- load_geo()
+
+# 2. Parquet cache -----
+
+.var_cache <- new.env(parent = emptyenv())
+
+load_variable_cached <- function(var_code) {
+  if (is.null(.var_cache[[var_code]])) {
+    .var_cache[[var_code]] <- load_variable(var_code)
+  }
+  .var_cache[[var_code]]
+}
+
+# 3. Page configuration registry -----
+
+PAGE_CONFIG <- list(
+  popolazione_demografia = list(
+    page_id = "pop",
+    vars    = c("SNPTD", "SNPTN", "SNPBN", "SNPDN", "SNPNN", "SNMTN", "SNPCN"),
+    vb1_var = "SNPTD", vb1_unit = "NR",    vb1_icon = "fa-users",      vb1_color = "primary",
+    vb2_var = "SNPCN", vb2_unit = "GROWRT", vb2_icon = "fa-chart-line", vb2_color = "info",
+    vb1_filter = list(unit = "NR"),
+    vb2_filter = list(unit = "GROWRT", sex = "TOTAL", age = "TOTAL"),
+    vb1_title  = "Popolazione totale (Lombardia)",
+    vb2_title  = "Variazione popolazione (Lombardia)",
+    vb1_format = function(v) format(round(v), big.mark = "."),
+    vb2_format = function(v) paste0(round(v, 2), "\u2030")
+  ),
+  mercato_lavoro = list(
+    page_id = "lab",
+    vars    = c("RPECNP", "RPUCNP", "SNETD", "SNWTD", "RNECN", "RNUTN", "RNLCN", "RNLHT"),
+    vb1_var = "RPECNP", vb1_unit = "PC",  vb1_icon = "fa-briefcase",  vb1_color = "success",
+    vb2_var = "RPUCNP", vb2_unit = "PC",  vb2_icon = "fa-user-times", vb2_color = "warning",
+    vb1_filter = list(unit = "PC"),
+    vb2_filter = list(unit = "PC"),
+    vb1_title  = "Tasso di occupazione (Lombardia)",
+    vb2_title  = "Tasso di disoccupazione (Lombardia)",
+    vb1_format = function(v) paste0(round(v, 1), "%"),
+    vb2_format = function(v) paste0(round(v, 1), "%")
+  ),
+  occupazione_settore = list(
+    page_id = "sec",
+    vars    = c("SNETZ", "RNLHZ"),
+    vb1_var = "SNETZ", vb1_unit = "THS", vb1_icon = "fa-building",       vb1_color = "primary",
+    vb2_var = "SNETZ", vb2_unit = "THS", vb2_icon = "fa-calendar-check", vb2_color = "info",
+    vb1_filter = list(unit = "THS"),
+    vb2_filter = list(unit = "THS"),
+    vb1_title  = "Settori NACE disponibili",
+    vb2_title  = "Ultimo anno disponibile",
+    vb1_format = function(v) as.character(v),
+    vb2_format = function(v) as.character(v),
+    is_sector_page = TRUE
+  ),
+  pil_valore_aggiunto = list(
+    page_id = "gdp",
+    vars    = c("SUVGD", "SOVGD", "SUVGE", "SOVGE", "SUVGZ", "SOVGZ",
+                "SUVGDH", "SUVGDE", "SOVGDH", "SOVGDE"),
+    vb1_var = "SUVGD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-euro-sign", vb1_color = "success",
+    vb2_var = "SOVGD", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-chart-bar", vb2_color = "info",
+    vb1_filter = list(unit = "MIO_EUR"),
+    vb2_filter = list(unit = "MIO_EUR2015"),
+    vb1_title  = "PIL corrente (Lombardia)",
+    vb2_title  = "PIL costante (Lombardia)",
+    vb1_format = function(v) format(round(v), big.mark = "."),
+    vb2_format = function(v) format(round(v), big.mark = ".")
+  ),
+  reddito_compensi = list(
+    page_id = "inc",
+    vars    = c("RUWCD", "ROWCD"),
+    vb1_var = "RUWCD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-wallet", vb1_color = "primary",
+    vb2_var = "ROWCD", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-wallet", vb2_color = "info",
+    vb1_filter = list(unit = "MIO_EUR"),
+    vb2_filter = list(unit = "MIO_EUR2015"),
+    vb1_title  = "Compensi correnti (Lombardia)",
+    vb2_title  = "Compensi costanti (Lombardia)",
+    vb1_format = function(v) format(round(v), big.mark = "."),
+    vb2_format = function(v) format(round(v), big.mark = ".")
+  ),
+  formazione_capitale = list(
+    page_id = "cap",
+    vars    = c("RUIGT", "ROIGT", "RUIGZ", "ROIGZ"),
+    vb1_var = "RUIGT", vb1_unit = "MIO_EUR",     vb1_icon = "fa-hammer", vb1_color = "success",
+    vb2_var = "ROIGT", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-tools",  vb2_color = "info",
+    vb1_filter = list(unit = "MIO_EUR"),
+    vb2_filter = list(unit = "MIO_EUR2015"),
+    vb1_title  = "FBCF corrente (Lombardia)",
+    vb2_title  = "FBCF costante (Lombardia)",
+    vb1_format = function(v) format(round(v), big.mark = "."),
+    vb2_format = function(v) format(round(v), big.mark = ".")
+  )
+)
+
+# 4. Helper: check if variable has sector dimension -----
+
+is_sector_var <- function(var_code) {
+  dt <- load_variable_cached(var_code)
+  "SECTOR" %in% names(dt) && any(!is.na(dt$SECTOR))
+}
+
+# 5. Server-side page module -----
+
+make_page_server <- function(page_id, group_id, input, output, session) {
+  cfg <- PAGE_CONFIG[[group_id]]
+
+  # -- Reactive: selected variable's cached data --
+  rv_data <- reactive({
+    req(input[[paste0(page_id, "_var")]])
+    load_variable_cached(input[[paste0(page_id, "_var")]])
+  })
+
+  # -- Reactive: available dimensions --
+  rv_dims <- reactive({
+    get_var_dimensions(rv_data())
+  })
+
+  # -- Dynamic UI for dimension selectors --
+  output[[paste0(page_id, "_unit_ui")]] <- renderUI({
+    dims <- rv_dims()
+    choices <- setNames(
+      dims$units,
+      vapply(dims$units, get_unit_label, character(1L), labels = LABELS)
+    )
+    selectInput(paste0(page_id, "_unit"), "Unita di misura", choices = choices)
+  })
+
+  output[[paste0(page_id, "_sex_ui")]] <- renderUI({
+    dims <- rv_dims()
+    if (is.null(dims$sex)) return(NULL)
+    choices <- setNames(
+      dims$sex,
+      vapply(dims$sex, get_sex_label, character(1L), labels = LABELS)
+    )
+    selectInput(paste0(page_id, "_sex"), "Sesso", choices = choices)
+  })
+
+  output[[paste0(page_id, "_age_ui")]] <- renderUI({
+    dims <- rv_dims()
+    if (is.null(dims$age)) return(NULL)
+    choices <- setNames(
+      dims$age,
+      vapply(dims$age, get_age_label, character(1L), labels = LABELS)
+    )
+    selectInput(paste0(page_id, "_age"), "Classe di eta", choices = choices)
+  })
+
+  output[[paste0(page_id, "_sector_ui")]] <- renderUI({
+    dims <- rv_dims()
+    if (is.null(dims$sector)) return(NULL)
+    choices <- setNames(
+      dims$sector,
+      vapply(dims$sector, get_sector_label, character(1L), labels = LABELS)
+    )
+    selectInput(paste0(page_id, "_sector"), "Settore", choices = choices)
+  })
+
+  # -- Reactive: filtered data --
+  rv_filtered <- reactive({
+    dt <- rv_data()
+    dims <- rv_dims()
+
+    # Wait for all dimension selectors that exist for this variable
+    req(input[[paste0(page_id, "_unit")]])
+    unit_val <- input[[paste0(page_id, "_unit")]]
+
+    sex_val <- NULL
+    if (!is.null(dims$sex)) {
+      req(input[[paste0(page_id, "_sex")]])
+      sex_val <- input[[paste0(page_id, "_sex")]]
+    }
+
+    age_val <- NULL
+    if (!is.null(dims$age)) {
+      req(input[[paste0(page_id, "_age")]])
+      age_val <- input[[paste0(page_id, "_age")]]
+    }
+
+    sector_val <- NULL
+    if (!is.null(dims$sector)) {
+      req(input[[paste0(page_id, "_sector")]])
+      sector_val <- input[[paste0(page_id, "_sector")]]
+    }
+
+    filter_data(dt, unit = unit_val, sex = sex_val, age = age_val, sector = sector_val)
+  })
+
+  # -- Current labels --
+  rv_var_label <- reactive({
+    req(input[[paste0(page_id, "_var")]])
+    get_var_label(input[[paste0(page_id, "_var")]], LABELS)
+  })
+
+  rv_unit_label <- reactive({
+    req(input[[paste0(page_id, "_unit")]])
+    get_unit_label(input[[paste0(page_id, "_unit")]], LABELS)
+  })
+
+  # -- Value boxes --
+  output[[paste0(page_id, "_vb1")]] <- renderValueBox({
+    dt <- load_variable_cached(cfg$vb1_var)
+    dt_itc4 <- dt[NUTSCODE == "ITC4"]
+    if (!isTRUE(cfg$is_sector_page)) {
+      dt_itc4 <- do.call(filter_data, c(list(dt = dt_itc4), cfg$vb1_filter))
+      ensure_unique(dt_itc4)
+      ref_year <- max(dt_itc4$YEAR)
+      latest <- dt_itc4[YEAR == ref_year]
+      val <- cfg$vb1_format(latest$VALUE[1L])
+      caption <- paste0(cfg$vb1_title, " (", ref_year, ")")
+    } else {
+      n_sectors <- length(unique(dt[!is.na(SECTOR), SECTOR]))
+      val <- as.character(n_sectors)
+      caption <- cfg$vb1_title
+    }
+    valueBox(val, caption = caption, icon = cfg$vb1_icon, color = cfg$vb1_color)
+  })
+
+  output[[paste0(page_id, "_vb2")]] <- renderValueBox({
+    dt <- load_variable_cached(cfg$vb2_var)
+    dt_itc4 <- dt[NUTSCODE == "ITC4"]
+    if (!isTRUE(cfg$is_sector_page)) {
+      dt_itc4 <- do.call(filter_data, c(list(dt = dt_itc4), cfg$vb2_filter))
+      ensure_unique(dt_itc4)
+      ref_year <- max(dt_itc4$YEAR)
+      latest <- dt_itc4[YEAR == ref_year]
+      val <- cfg$vb2_format(latest$VALUE[1L])
+      caption <- paste0(cfg$vb2_title, " (", ref_year, ")")
+    } else {
+      val <- as.character(max(dt$YEAR, na.rm = TRUE))
+      caption <- cfg$vb2_title
+    }
+    valueBox(val, caption = caption, icon = cfg$vb2_icon, color = cfg$vb2_color)
+  })
+
+  # -- Time-series chart --
+  output[[paste0(page_id, "_ts")]] <- plotly::renderPlotly({
+    var_code <- input[[paste0(page_id, "_var")]]
+    req(var_code)
+    var_label  <- rv_var_label()
+    unit_label <- rv_unit_label()
+
+    dt_filt <- rv_filtered()
+    ensure_unique(dt_filt)
+    ts_plotly_regional(dt_filt, var_label, unit_label)
+  })
+
+  # -- Leaflet map --
+  output[[paste0(page_id, "_map")]] <- leaflet::renderLeaflet({
+    var_label  <- rv_var_label()
+    unit_label <- rv_unit_label()
+    dt_filt    <- rv_filtered()
+
+    # For sector vars, include selected sector name in the map label
+    sector_val <- input[[paste0(page_id, "_sector")]]
+    if (!is.null(sector_val)) {
+      sector_name <- get_sector_label(sector_val, LABELS)
+      var_label <- paste0(var_label, " \u2014 ", sector_name)
+    }
+
+    map_leaflet(dt_filt, GEO, var_label, unit_label)
+  })
+
+}
+```
+
+# Popolazione e demografia
+
+## {.sidebar}
+
+```{r}
+selectInput("pop_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$popolazione_demografia$vars,
+    vapply(PAGE_CONFIG$popolazione_demografia$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("pop_unit_ui")
+uiOutput("pop_sex_ui")
+uiOutput("pop_age_ui")
+uiOutput("pop_sector_ui")
+```
+
+## Row {data-height=120}
+
+### Popolazione totale
+
+```{r}
+valueBoxOutput("pop_vb1")
+```
+
+### Variazione popolazione
+
+```{r}
+valueBoxOutput("pop_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("pop_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("pop_map")
+```
+
+
+# Mercato del lavoro
+
+## {.sidebar}
+
+```{r}
+selectInput("lab_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$mercato_lavoro$vars,
+    vapply(PAGE_CONFIG$mercato_lavoro$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("lab_unit_ui")
+uiOutput("lab_sex_ui")
+uiOutput("lab_age_ui")
+uiOutput("lab_sector_ui")
+```
+
+## Row {data-height=120}
+
+### Tasso di occupazione
+
+```{r}
+valueBoxOutput("lab_vb1")
+```
+
+### Tasso di disoccupazione
+
+```{r}
+valueBoxOutput("lab_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("lab_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("lab_map")
+```
+
+
+# Occupazione per settore
+
+## {.sidebar}
+
+```{r}
+selectInput("sec_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$occupazione_settore$vars,
+    vapply(PAGE_CONFIG$occupazione_settore$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("sec_unit_ui")
+uiOutput("sec_sex_ui")
+uiOutput("sec_age_ui")
+uiOutput("sec_sector_ui")
+```
+
+## Row {data-height=120}
+
+### Settori NACE disponibili
+
+```{r}
+valueBoxOutput("sec_vb1")
+```
+
+### Ultimo anno disponibile
+
+```{r}
+valueBoxOutput("sec_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("sec_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("sec_map")
+```
+
+
+# PIL e valore aggiunto
+
+## {.sidebar}
+
+```{r}
+selectInput("gdp_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$pil_valore_aggiunto$vars,
+    vapply(PAGE_CONFIG$pil_valore_aggiunto$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("gdp_unit_ui")
+uiOutput("gdp_sex_ui")
+uiOutput("gdp_age_ui")
+uiOutput("gdp_sector_ui")
+```
+
+## Row {data-height=120}
+
+### PIL corrente
+
+```{r}
+valueBoxOutput("gdp_vb1")
+```
+
+### PIL costante
+
+```{r}
+valueBoxOutput("gdp_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("gdp_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("gdp_map")
+```
+
+
+# Reddito e compensi
+
+## {.sidebar}
+
+```{r}
+selectInput("inc_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$reddito_compensi$vars,
+    vapply(PAGE_CONFIG$reddito_compensi$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("inc_unit_ui")
+uiOutput("inc_sex_ui")
+uiOutput("inc_age_ui")
+uiOutput("inc_sector_ui")
+```
+
+## Row {data-height=120}
+
+### Compensi correnti
+
+```{r}
+valueBoxOutput("inc_vb1")
+```
+
+### Compensi costanti
+
+```{r}
+valueBoxOutput("inc_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("inc_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("inc_map")
+```
+
+
+# Formazione del capitale
+
+## {.sidebar}
+
+```{r}
+selectInput("cap_var", "Variabile",
+  choices = setNames(
+    PAGE_CONFIG$formazione_capitale$vars,
+    vapply(PAGE_CONFIG$formazione_capitale$vars,
+           get_var_label, character(1L), labels = LABELS)
+  )
+)
+uiOutput("cap_unit_ui")
+uiOutput("cap_sex_ui")
+uiOutput("cap_age_ui")
+uiOutput("cap_sector_ui")
+```
+
+## Row {data-height=120}
+
+### FBCF corrente
+
+```{r}
+valueBoxOutput("cap_vb1")
+```
+
+### FBCF costante
+
+```{r}
+valueBoxOutput("cap_vb2")
+```
+
+## Row {data-height=880}
+
+### Serie storica {data-width=600}
+
+```{r}
+plotly::plotlyOutput("cap_ts")
+```
+
+### Mappa {data-width=400}
+
+```{r}
+leaflet::leafletOutput("cap_map")
+```
+
+```{r server-context, context="server"}
+# 1. Register server logic for all 6 pages -----
+
+for (gid in names(PAGE_CONFIG)) {
+  local({
+    group_id <- gid
+    pid <- PAGE_CONFIG[[group_id]]$page_id
+    make_page_server(pid, group_id, input, output, session)
+  })
+}
+```

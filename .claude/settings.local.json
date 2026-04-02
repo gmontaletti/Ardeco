@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "mcp__r-btw__btw_tool_search_package_info",
+      "mcp__r-btw__btw_tool_docs_package_help_topics",
+      "mcp__r-btw__btw_tool_docs_help_page",
+      "WebFetch(domain:territorial.ec.europa.eu)",
+      "WebFetch(domain:quarto.org)",
+      "mcp__r-btw__btw_tool_docs_available_vignettes",
+      "mcp__r-btw__btw_tool_docs_vignette",
+      "Bash(python3:*)",
+      "WebSearch",
+      "WebFetch(domain:en.wikipedia.org)",
+      "mcp__r-btw__btw_tool_session_check_package_installed",
+      "mcp__r-btw__list_r_sessions",
+      "Bash(Rscript:*)",
+      "Bash(quarto render:*)",
+      "Bash(open:*)",
+      "Bash(ls:*)",
+      "mcp__r-btw__btw_tool_session_package_info",
+      "Bash(find /Users/giampaolomontaletti/Documents/funzioni/Ardeco -type f \\\\\\( ! -path \"*/_site/*\" ! -path \"*/.claude/*\" \\\\\\) -exec ls -lh {} \\\\;)",
+      "Bash(sort -k2)",
+      "Bash(mv index.qmd index.qmd.bak)",
+      "Bash(rm -f _quarto.yml)",
+      "Bash(rm -rf _site)",
+      "Bash(xargs kill:*)"
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('shown.bs.tab', function(event) {
+    var target = document.querySelector(event.target.getAttribute('data-bs-target'));
+    if (!target) return;
+    var plots = target.querySelectorAll('.plotly-graph-div');
+    plots.forEach(function(plot) {
+      if (plot.data) {
+        Plotly.Plots.resize(plot);
+      }
+    });
+  });
+});
+</script>

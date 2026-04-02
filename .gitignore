@@ -1,0 +1,17 @@
+# Data files
+data/*.parquet
+data/*.gpkg
+
+# Quarto output
+_site/
+dashboard/_site/
+.quarto/
+
+# RStudio
+.Rproj.user/
+*.Rhistory
+*.RData
+.Rdata
+
+# OS
+.DS_Store

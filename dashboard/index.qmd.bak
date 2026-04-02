@@ -1,0 +1,1338 @@
+---
+title: "ARDECO Lombardia"
+format:
+  dashboard:
+    orientation: rows
+    nav-buttons: [github]
+    theme: cosmo
+include-after-body: R/plotly-resize.html
+---
+
+```{css}
+#| echo: false
+.bslib-value-box .value-box-grid {
+  overflow: visible !important;
+}
+```
+
+```{r}
+#| label: setup
+#| include: false
+
+source("R/helpers.R")
+
+# 1. Labels and geography -----
+
+labels <- load_labels()
+geo    <- load_geo()
+```
+
+# Popolazione e demografia
+
+```{r}
+#| label: pop-load
+#| include: false
+
+# 1. Load all population variables once -----
+
+snptd <- load_variable("SNPTD")
+snptn <- load_variable("SNPTN")
+snpbn <- load_variable("SNPBN")
+snpdn <- load_variable("SNPDN")
+snpnn <- load_variable("SNPNN")
+snmtn <- load_variable("SNMTN")
+snpcn <- load_variable("SNPCN")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: pop-vb1
+#| content: valuebox
+#| title: "Popolazione totale (Lombardia)"
+
+# 1. Value box: SNPTD, ITC4, latest year -----
+
+snptd_itc4 <- filter_data(snptd[NUTSCODE == "ITC4"], unit = "NR")
+ensure_unique(snptd_itc4)
+latest_snptd <- snptd_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "people-fill",
+  color = "primary",
+  value = format(round(latest_snptd$VALUE[1]), big.mark = ",")
+)
+```
+
+```{r}
+#| label: pop-vb2
+#| content: valuebox
+#| title: "Variazione popolazione (Lombardia)"
+
+# 2. Value box: SNPCN growth rate, ITC4, latest year -----
+
+snpcn_itc4 <- filter_data(snpcn[NUTSCODE == "ITC4"], unit = "GROWRT",
+                           sex = "TOTAL", age = "TOTAL")
+ensure_unique(snpcn_itc4)
+latest_snpcn <- snpcn_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "graph-up-arrow",
+  color = "info",
+  value = paste0(round(latest_snpcn$VALUE[1], 2), "%")
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### Popolazione media annua
+
+```{r}
+#| label: pop-ts-snptd
+
+# 1. SNPTD — single unit NR, no SEX/AGE breakdown -----
+
+snptd_filt <- filter_data(snptd, unit = "NR")
+ensure_unique(snptd_filt)
+ts_plotly_regional(
+  snptd_filt,
+  var_label  = get_var_label("SNPTD", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+#### Popolazione per sesso ed età
+
+```{r}
+#| label: pop-ts-snptn
+
+# 2. SNPTN — nested tabs by SEX -----
+```
+
+::: {.panel-tabset}
+
+##### Totale
+
+```{r}
+#| label: pop-ts-snptn-tot
+
+snptn_tot <- filter_data(snptn, unit = "NR", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snptn_tot)
+ts_plotly_regional(
+  snptn_tot,
+  var_label  = get_var_label("SNPTN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Femmine
+
+```{r}
+#| label: pop-ts-snptn-f
+
+snptn_f <- filter_data(snptn, unit = "NR", sex = "F", age = "TOTAL")
+ensure_unique(snptn_f)
+ts_plotly_regional(
+  snptn_f,
+  var_label  = paste0(get_var_label("SNPTN", labels), " — Femmine"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Maschi
+
+```{r}
+#| label: pop-ts-snptn-m
+
+snptn_m <- filter_data(snptn, unit = "NR", sex = "M", age = "TOTAL")
+ensure_unique(snptn_m)
+ts_plotly_regional(
+  snptn_m,
+  var_label  = paste0(get_var_label("SNPTN", labels), " — Maschi"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+:::
+
+#### Nati vivi
+
+```{r}
+#| label: pop-ts-snpbn
+
+# 3. SNPBN — nested tabs by SEX -----
+```
+
+::: {.panel-tabset}
+
+##### Totale
+
+```{r}
+#| label: pop-ts-snpbn-tot
+
+snpbn_tot <- filter_data(snpbn, unit = "NR", sex = "TOTAL")
+ensure_unique(snpbn_tot)
+ts_plotly_regional(
+  snpbn_tot,
+  var_label  = get_var_label("SNPBN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Femmine
+
+```{r}
+#| label: pop-ts-snpbn-f
+
+snpbn_f <- filter_data(snpbn, unit = "NR", sex = "F")
+ensure_unique(snpbn_f)
+ts_plotly_regional(
+  snpbn_f,
+  var_label  = paste0(get_var_label("SNPBN", labels), " — Femmine"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Maschi
+
+```{r}
+#| label: pop-ts-snpbn-m
+
+snpbn_m <- filter_data(snpbn, unit = "NR", sex = "M")
+ensure_unique(snpbn_m)
+ts_plotly_regional(
+  snpbn_m,
+  var_label  = paste0(get_var_label("SNPBN", labels), " — Maschi"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+:::
+
+#### Decessi
+
+```{r}
+#| label: pop-ts-snpdn
+
+# 4. SNPDN — nested tabs by SEX at AGE = TOTAL -----
+```
+
+::: {.panel-tabset}
+
+##### Totale
+
+```{r}
+#| label: pop-ts-snpdn-tot
+
+snpdn_tot <- filter_data(snpdn, unit = "NR", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snpdn_tot)
+ts_plotly_regional(
+  snpdn_tot,
+  var_label  = get_var_label("SNPDN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Femmine
+
+```{r}
+#| label: pop-ts-snpdn-f
+
+snpdn_f <- filter_data(snpdn, unit = "NR", sex = "F", age = "TOTAL")
+ensure_unique(snpdn_f)
+ts_plotly_regional(
+  snpdn_f,
+  var_label  = paste0(get_var_label("SNPDN", labels), " — Femmine"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Maschi
+
+```{r}
+#| label: pop-ts-snpdn-m
+
+snpdn_m <- filter_data(snpdn, unit = "NR", sex = "M", age = "TOTAL")
+ensure_unique(snpdn_m)
+ts_plotly_regional(
+  snpdn_m,
+  var_label  = paste0(get_var_label("SNPDN", labels), " — Maschi"),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+:::
+
+#### Variazione naturale
+
+```{r}
+#| label: pop-ts-snpnn
+
+# 5. SNPNN — single (TOTAL, TOTAL) -----
+
+snpnn_filt <- filter_data(snpnn, unit = "NR", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snpnn_filt)
+ts_plotly_regional(
+  snpnn_filt,
+  var_label  = get_var_label("SNPNN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+#### Migrazione netta
+
+```{r}
+#| label: pop-ts-snmtn
+
+# 6. SNMTN — single (TOTAL, TOTAL) -----
+
+snmtn_filt <- filter_data(snmtn, unit = "NR", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snmtn_filt)
+ts_plotly_regional(
+  snmtn_filt,
+  var_label  = get_var_label("SNMTN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+#### Variazione della popolazione
+
+```{r}
+#| label: pop-ts-snpcn
+
+# 7. SNPCN — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Numero
+
+```{r}
+#| label: pop-ts-snpcn-nr
+
+snpcn_nr <- filter_data(snpcn, unit = "NR", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snpcn_nr)
+ts_plotly_regional(
+  snpcn_nr,
+  var_label  = get_var_label("SNPCN", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+##### Tasso
+
+```{r}
+#| label: pop-ts-snpcn-gr
+
+snpcn_gr <- filter_data(snpcn, unit = "GROWRT", sex = "TOTAL", age = "TOTAL")
+ensure_unique(snpcn_gr)
+ts_plotly_regional(
+  snpcn_gr,
+  var_label  = get_var_label("SNPCN", labels),
+  unit_label = get_unit_label("GROWRT", labels)
+)
+```
+
+:::
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: pop-map
+
+# Map: SNPTD flagship -----
+
+snptd_map <- filter_data(snptd, unit = "NR")
+map_leaflet(
+  snptd_map,
+  geo        = geo,
+  var_label  = get_var_label("SNPTD", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: pop-table
+
+# Table: SNPTD -----
+
+snptd_tbl <- filter_data(snptd, unit = "NR")
+summary_dt(
+  snptd_tbl,
+  var_label  = get_var_label("SNPTD", labels),
+  unit_label = get_unit_label("NR", labels)
+)
+```
+
+# Mercato del lavoro
+
+```{r}
+#| label: lab-load
+#| include: false
+
+# 1. Load all labour market variables once -----
+
+snetd <- load_variable("SNETD")
+snwtd <- load_variable("SNWTD")
+rnecn <- load_variable("RNECN")
+rnutn <- load_variable("RNUTN")
+rnlcn <- load_variable("RNLCN")
+rnlht <- load_variable("RNLHT")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: lab-vb1
+#| content: valuebox
+#| title: "Tasso di occupazione (Lombardia)"
+
+# 1. Value box: RNECN, ITC4, latest year -----
+
+rnecn_itc4 <- filter_data(rnecn[NUTSCODE == "ITC4"], age = "Y20-64")
+ensure_unique(rnecn_itc4)
+latest_rnecn <- rnecn_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "briefcase-fill",
+  color = "success",
+  value = paste0(round(latest_rnecn$VALUE[1], 1), "%")
+)
+```
+
+```{r}
+#| label: lab-vb2
+#| content: valuebox
+#| title: "Tasso di disoccupazione (Lombardia)"
+
+# 2. Value box: RNUTN, ITC4, latest year -----
+
+rnutn_itc4 <- filter_data(rnutn[NUTSCODE == "ITC4"])
+ensure_unique(rnutn_itc4)
+latest_rnutn <- rnutn_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "person-x-fill",
+  color = "warning",
+  value = paste0(round(latest_rnutn$VALUE[1], 1), "%")
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### Occupazione workplace-based
+
+```{r}
+#| label: lab-ts-snetd
+
+# 1. SNETD -----
+
+snetd_filt <- filter_data(snetd, unit = "THS")
+ensure_unique(snetd_filt)
+ts_plotly_regional(
+  snetd_filt,
+  var_label  = get_var_label("SNETD", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+#### Dipendenti workplace-based
+
+```{r}
+#| label: lab-ts-snwtd
+
+# 2. SNWTD -----
+
+snwtd_filt <- filter_data(snwtd, unit = "THS")
+ensure_unique(snwtd_filt)
+ts_plotly_regional(
+  snwtd_filt,
+  var_label  = get_var_label("SNWTD", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+#### Tasso di occupazione
+
+```{r}
+#| label: lab-ts-rnecn
+
+# 3. RNECN — filter to age 20-64 (standard employment rate) -----
+
+rnecn_filt <- filter_data(rnecn, age = "Y20-64")
+ensure_unique(rnecn_filt)
+ts_plotly_regional(
+  rnecn_filt,
+  var_label  = get_var_label("RNECN", labels),
+  unit_label = get_unit_label(rnecn_filt$UNIT[1], labels)
+)
+```
+
+#### Tasso di disoccupazione
+
+```{r}
+#| label: lab-ts-rnutn
+
+# 4. RNUTN — single unit -----
+
+rnutn_filt <- filter_data(rnutn)
+ensure_unique(rnutn_filt)
+ts_plotly_regional(
+  rnutn_filt,
+  var_label  = get_var_label("RNUTN", labels),
+  unit_label = get_unit_label(rnutn_filt$UNIT[1], labels)
+)
+```
+
+#### Forza lavoro
+
+```{r}
+#| label: lab-ts-rnlcn
+
+# 5. RNLCN — single unit -----
+
+rnlcn_filt <- filter_data(rnlcn)
+ensure_unique(rnlcn_filt)
+ts_plotly_regional(
+  rnlcn_filt,
+  var_label  = get_var_label("RNLCN", labels),
+  unit_label = get_unit_label(rnlcn_filt$UNIT[1], labels)
+)
+```
+
+#### Ore lavorate
+
+```{r}
+#| label: lab-ts-rnlht
+
+# 6. RNLHT -----
+
+rnlht_filt <- filter_data(rnlht, unit = "THS")
+ensure_unique(rnlht_filt)
+ts_plotly_regional(
+  rnlht_filt,
+  var_label  = get_var_label("RNLHT", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: lab-map
+
+# Map: SNETD -----
+
+snetd_map <- filter_data(snetd, unit = "THS")
+map_leaflet(
+  snetd_map,
+  geo        = geo,
+  var_label  = get_var_label("SNETD", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: lab-table
+
+# Table: SNETD -----
+
+snetd_tbl <- filter_data(snetd, unit = "THS")
+summary_dt(
+  snetd_tbl,
+  var_label  = get_var_label("SNETD", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+# Occupazione per settore
+
+```{r}
+#| label: sec-load
+#| include: false
+
+# 1. Load sector-disaggregated variables once -----
+
+snetz <- load_variable("SNETZ")
+rnlhz <- load_variable("RNLHZ")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: sec-vb1
+#| content: valuebox
+#| title: "Settori NACE disponibili"
+
+# 1. Count unique non-NA sectors in SNETZ -----
+
+n_sectors <- length(unique(snetz[!is.na(SECTOR), SECTOR]))
+
+list(
+  icon  = "building",
+  color = "primary",
+  value = as.character(n_sectors)
+)
+```
+
+```{r}
+#| label: sec-vb2
+#| content: valuebox
+#| title: "Ultimo anno disponibile"
+
+# 2. Max year in SNETZ -----
+
+list(
+  icon  = "calendar-check",
+  color = "info",
+  value = as.character(max(snetz$YEAR, na.rm = TRUE))
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### Occupazione per settore NACE
+
+```{r}
+#| label: sec-ts-snetz
+
+# 1. SNETZ sector chart — keep all non-NA sectors -----
+
+snetz_sec <- snetz[!is.na(SECTOR)]
+ts_plotly_by_sector(
+  snetz_sec,
+  var_label  = get_var_label("SNETZ", labels),
+  unit_label = get_unit_label("THS", labels),
+  labels     = labels
+)
+```
+
+#### Ore lavorate per settore NACE
+
+```{r}
+#| label: sec-ts-rnlhz
+
+# 2. RNLHZ sector chart — keep all non-NA sectors -----
+
+rnlhz_sec <- rnlhz[!is.na(SECTOR)]
+ts_plotly_by_sector(
+  rnlhz_sec,
+  var_label  = get_var_label("RNLHZ", labels),
+  unit_label = get_unit_label("THS", labels),
+  labels     = labels
+)
+```
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: sec-map
+
+# Map: SNETZ sector O-U (total economy) -----
+
+snetz_map <- filter_data(snetz[SECTOR == "O-U"])
+map_leaflet(
+  snetz_map,
+  geo        = geo,
+  var_label  = get_var_label("SNETZ", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: sec-table
+
+# Table: SNETZ sector O-U -----
+
+snetz_tbl <- filter_data(snetz[SECTOR == "O-U"])
+summary_dt(
+  snetz_tbl,
+  var_label  = get_var_label("SNETZ", labels),
+  unit_label = get_unit_label("THS", labels)
+)
+```
+
+# PIL e valore aggiunto
+
+```{r}
+#| label: gdp-load
+#| include: false
+
+# 1. Load GDP and value-added variables once -----
+
+suvgd <- load_variable("SUVGD")
+sovgd <- load_variable("SOVGD")
+suvge <- load_variable("SUVGE")
+sovge <- load_variable("SOVGE")
+suvgz <- load_variable("SUVGZ")
+sovgz <- load_variable("SOVGZ")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: gdp-vb1
+#| content: valuebox
+#| title: "PIL corrente (Lombardia)"
+
+# 1. Value box: SUVGD MIO_EUR, ITC4, latest year -----
+
+suvgd_itc4 <- filter_data(suvgd[NUTSCODE == "ITC4"],
+                           unit = "MIO_EUR")
+ensure_unique(suvgd_itc4)
+latest_suvgd <- suvgd_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "currency-euro",
+  color = "success",
+  value = format(round(latest_suvgd$VALUE[1]), big.mark = ",")
+)
+```
+
+```{r}
+#| label: gdp-vb2
+#| content: valuebox
+#| title: "PIL costante (Lombardia)"
+
+# 2. Value box: SOVGD MIO_EUR2015, ITC4, latest year -----
+
+sovgd_itc4 <- filter_data(sovgd[NUTSCODE == "ITC4"],
+                           unit = "MIO_EUR2015")
+ensure_unique(sovgd_itc4)
+latest_sovgd <- sovgd_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "bar-chart-fill",
+  color = "info",
+  value = format(round(latest_sovgd$VALUE[1]), big.mark = ",")
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### PIL a prezzi correnti
+
+```{r}
+#| label: gdp-ts-suvgd
+
+# 1. SUVGD — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Milioni di euro
+
+```{r}
+#| label: gdp-ts-suvgd-eur
+
+suvgd_eur <- filter_data(suvgd, unit = "MIO_EUR")
+ensure_unique(suvgd_eur)
+ts_plotly_regional(
+  suvgd_eur,
+  var_label  = get_var_label("SUVGD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+##### Milioni di PPS
+
+```{r}
+#| label: gdp-ts-suvgd-pps
+
+suvgd_pps <- filter_data(suvgd, unit = "MIO_PPS_EU27_2020")
+ensure_unique(suvgd_pps)
+ts_plotly_regional(
+  suvgd_pps,
+  var_label  = get_var_label("SUVGD", labels),
+  unit_label = get_unit_label("MIO_PPS_EU27_2020", labels)
+)
+```
+
+:::
+
+#### PIL a prezzi costanti
+
+```{r}
+#| label: gdp-ts-sovgd
+
+# 2. SOVGD — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Prezzi 2015
+
+```{r}
+#| label: gdp-ts-sovgd-2015
+
+sovgd_2015 <- filter_data(sovgd, unit = "MIO_EUR2015")
+ensure_unique(sovgd_2015)
+ts_plotly_regional(
+  sovgd_2015,
+  var_label  = get_var_label("SOVGD", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels)
+)
+```
+
+##### Prezzi 2020
+
+```{r}
+#| label: gdp-ts-sovgd-2020
+
+sovgd_2020 <- filter_data(sovgd, unit = "MIO_EUR2020")
+ensure_unique(sovgd_2020)
+ts_plotly_regional(
+  sovgd_2020,
+  var_label  = get_var_label("SOVGD", labels),
+  unit_label = get_unit_label("MIO_EUR2020", labels)
+)
+```
+
+:::
+
+#### Valore aggiunto corrente
+
+```{r}
+#| label: gdp-ts-suvge
+
+# 3. SUVGE — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Milioni di euro
+
+```{r}
+#| label: gdp-ts-suvge-eur
+
+suvge_eur <- filter_data(suvge, unit = "MIO_EUR")
+ensure_unique(suvge_eur)
+ts_plotly_regional(
+  suvge_eur,
+  var_label  = get_var_label("SUVGE", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+##### Milioni di PPS
+
+```{r}
+#| label: gdp-ts-suvge-pps
+
+suvge_pps <- filter_data(suvge, unit = "MIO_PPS_EU27_2020")
+ensure_unique(suvge_pps)
+ts_plotly_regional(
+  suvge_pps,
+  var_label  = get_var_label("SUVGE", labels),
+  unit_label = get_unit_label("MIO_PPS_EU27_2020", labels)
+)
+```
+
+:::
+
+#### Valore aggiunto costante
+
+```{r}
+#| label: gdp-ts-sovge
+
+# 4. SOVGE — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Prezzi 2015
+
+```{r}
+#| label: gdp-ts-sovge-2015
+
+sovge_2015 <- filter_data(sovge, unit = "MIO_EUR2015")
+ensure_unique(sovge_2015)
+ts_plotly_regional(
+  sovge_2015,
+  var_label  = get_var_label("SOVGE", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels)
+)
+```
+
+##### Prezzi 2020
+
+```{r}
+#| label: gdp-ts-sovge-2020
+
+sovge_2020 <- filter_data(sovge, unit = "MIO_EUR2020")
+ensure_unique(sovge_2020)
+ts_plotly_regional(
+  sovge_2020,
+  var_label  = get_var_label("SOVGE", labels),
+  unit_label = get_unit_label("MIO_EUR2020", labels)
+)
+```
+
+:::
+
+#### VA per settore corrente
+
+```{r}
+#| label: gdp-ts-suvgz
+
+# 5. SUVGZ sector chart -----
+
+suvgz_sec <- suvgz[!is.na(SECTOR) & UNIT == "MIO_EUR"]
+ts_plotly_by_sector(
+  suvgz_sec,
+  var_label  = get_var_label("SUVGZ", labels),
+  unit_label = get_unit_label("MIO_EUR", labels),
+  labels     = labels
+)
+```
+
+#### VA per settore costante
+
+```{r}
+#| label: gdp-ts-sovgz
+
+# 6. SOVGZ sector chart -----
+
+sovgz_sec <- sovgz[!is.na(SECTOR) & UNIT == "MIO_EUR2015"]
+ts_plotly_by_sector(
+  sovgz_sec,
+  var_label  = get_var_label("SOVGZ", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels),
+  labels     = labels
+)
+```
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: gdp-map
+
+# Map: SUVGD MIO_EUR -----
+
+suvgd_map <- filter_data(suvgd, unit = "MIO_EUR")
+map_leaflet(
+  suvgd_map,
+  geo        = geo,
+  var_label  = get_var_label("SUVGD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: gdp-table
+
+# Table: SUVGD MIO_EUR -----
+
+suvgd_tbl <- filter_data(suvgd, unit = "MIO_EUR")
+summary_dt(
+  suvgd_tbl,
+  var_label  = get_var_label("SUVGD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+# Reddito e compensi
+
+```{r}
+#| label: inc-load
+#| include: false
+
+# 1. Load income and compensation variables once -----
+
+ruwcd <- load_variable("RUWCD")
+rowcd <- load_variable("ROWCD")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: inc-vb1
+#| content: valuebox
+#| title: "Compensi correnti (Lombardia)"
+
+# 1. Value box: RUWCD MIO_EUR, ITC4, latest year -----
+
+ruwcd_itc4 <- filter_data(ruwcd[NUTSCODE == "ITC4"], unit = "MIO_EUR")
+ensure_unique(ruwcd_itc4)
+latest_ruwcd <- ruwcd_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "wallet2",
+  color = "primary",
+  value = format(round(latest_ruwcd$VALUE[1]), big.mark = ",")
+)
+```
+
+```{r}
+#| label: inc-vb2
+#| content: valuebox
+#| title: "Compensi costanti (Lombardia)"
+
+# 2. Value box: ROWCD MIO_EUR2015, ITC4, latest year -----
+
+rowcd_itc4 <- filter_data(rowcd[NUTSCODE == "ITC4"], unit = "MIO_EUR2015")
+ensure_unique(rowcd_itc4)
+latest_rowcd <- rowcd_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "wallet-fill",
+  color = "info",
+  value = format(round(latest_rowcd$VALUE[1]), big.mark = ",")
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### Compensi a prezzi correnti
+
+```{r}
+#| label: inc-ts-ruwcd
+
+# 1. RUWCD — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Milioni di euro
+
+```{r}
+#| label: inc-ts-ruwcd-eur
+
+ruwcd_eur <- filter_data(ruwcd, unit = "MIO_EUR")
+ensure_unique(ruwcd_eur)
+ts_plotly_regional(
+  ruwcd_eur,
+  var_label  = get_var_label("RUWCD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+##### Milioni di PPS
+
+```{r}
+#| label: inc-ts-ruwcd-pps
+
+ruwcd_pps <- filter_data(ruwcd, unit = "MIO_PPS_EU27_2020")
+ensure_unique(ruwcd_pps)
+ts_plotly_regional(
+  ruwcd_pps,
+  var_label  = get_var_label("RUWCD", labels),
+  unit_label = get_unit_label("MIO_PPS_EU27_2020", labels)
+)
+```
+
+:::
+
+#### Compensi a prezzi costanti
+
+```{r}
+#| label: inc-ts-rowcd
+
+# 2. ROWCD — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Prezzi 2015
+
+```{r}
+#| label: inc-ts-rowcd-2015
+
+rowcd_2015 <- filter_data(rowcd, unit = "MIO_EUR2015")
+ensure_unique(rowcd_2015)
+ts_plotly_regional(
+  rowcd_2015,
+  var_label  = get_var_label("ROWCD", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels)
+)
+```
+
+##### Prezzi 2020
+
+```{r}
+#| label: inc-ts-rowcd-2020
+
+rowcd_2020 <- filter_data(rowcd, unit = "MIO_EUR2020")
+ensure_unique(rowcd_2020)
+ts_plotly_regional(
+  rowcd_2020,
+  var_label  = get_var_label("ROWCD", labels),
+  unit_label = get_unit_label("MIO_EUR2020", labels)
+)
+```
+
+:::
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: inc-map
+
+# Map: RUWCD MIO_EUR -----
+
+ruwcd_map <- filter_data(ruwcd, unit = "MIO_EUR")
+map_leaflet(
+  ruwcd_map,
+  geo        = geo,
+  var_label  = get_var_label("RUWCD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: inc-table
+
+# Table: RUWCD MIO_EUR -----
+
+ruwcd_tbl <- filter_data(ruwcd, unit = "MIO_EUR")
+summary_dt(
+  ruwcd_tbl,
+  var_label  = get_var_label("RUWCD", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+# Formazione del capitale
+
+```{r}
+#| label: cap-load
+#| include: false
+
+# 1. Load capital formation variables once -----
+
+ruigt <- load_variable("RUIGT")
+roigt <- load_variable("ROIGT")
+ruigz <- load_variable("RUIGZ")
+roigz <- load_variable("ROIGZ")
+```
+
+## Row {height="100px"}
+
+```{r}
+#| label: cap-vb1
+#| content: valuebox
+#| title: "FBCF corrente (Lombardia)"
+
+# 1. Value box: RUIGT MIO_EUR, ITC4, latest year -----
+
+ruigt_itc4 <- filter_data(ruigt[NUTSCODE == "ITC4"],
+                           unit = "MIO_EUR")
+ensure_unique(ruigt_itc4)
+latest_ruigt <- ruigt_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "hammer",
+  color = "success",
+  value = format(round(latest_ruigt$VALUE[1]), big.mark = ",")
+)
+```
+
+```{r}
+#| label: cap-vb2
+#| content: valuebox
+#| title: "FBCF costante (Lombardia)"
+
+# 2. Value box: ROIGT MIO_EUR2015, ITC4, latest year -----
+
+roigt_itc4 <- filter_data(roigt[NUTSCODE == "ITC4"],
+                           unit = "MIO_EUR2015")
+ensure_unique(roigt_itc4)
+latest_roigt <- roigt_itc4[YEAR == max(YEAR)]
+
+list(
+  icon  = "tools",
+  color = "info",
+  value = format(round(latest_roigt$VALUE[1]), big.mark = ",")
+)
+```
+
+## Row
+
+### Column {width="60%"}
+
+::: {.panel-tabset}
+
+#### FBCF a prezzi correnti
+
+```{r}
+#| label: cap-ts-ruigt
+
+# 1. RUIGT — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Milioni di euro
+
+```{r}
+#| label: cap-ts-ruigt-eur
+
+ruigt_eur <- filter_data(ruigt, unit = "MIO_EUR")
+ensure_unique(ruigt_eur)
+ts_plotly_regional(
+  ruigt_eur,
+  var_label  = get_var_label("RUIGT", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+##### Milioni di PPS
+
+```{r}
+#| label: cap-ts-ruigt-pps
+
+ruigt_pps <- filter_data(ruigt, unit = "MIO_PPS_EU27_2020")
+ensure_unique(ruigt_pps)
+ts_plotly_regional(
+  ruigt_pps,
+  var_label  = get_var_label("RUIGT", labels),
+  unit_label = get_unit_label("MIO_PPS_EU27_2020", labels)
+)
+```
+
+:::
+
+#### FBCF a prezzi costanti
+
+```{r}
+#| label: cap-ts-roigt
+
+# 2. ROIGT — nested tabs by UNIT -----
+```
+
+::: {.panel-tabset}
+
+##### Prezzi 2015
+
+```{r}
+#| label: cap-ts-roigt-2015
+
+roigt_2015 <- filter_data(roigt, unit = "MIO_EUR2015")
+ensure_unique(roigt_2015)
+ts_plotly_regional(
+  roigt_2015,
+  var_label  = get_var_label("ROIGT", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels)
+)
+```
+
+##### Prezzi 2020
+
+```{r}
+#| label: cap-ts-roigt-2020
+
+roigt_2020 <- filter_data(roigt, unit = "MIO_EUR2020")
+ensure_unique(roigt_2020)
+ts_plotly_regional(
+  roigt_2020,
+  var_label  = get_var_label("ROIGT", labels),
+  unit_label = get_unit_label("MIO_EUR2020", labels)
+)
+```
+
+:::
+
+#### FBCF per settore corrente
+
+```{r}
+#| label: cap-ts-ruigz
+
+# 3. RUIGZ sector chart -----
+
+ruigz_sec <- ruigz[!is.na(SECTOR) & UNIT == "MIO_EUR"]
+ts_plotly_by_sector(
+  ruigz_sec,
+  var_label  = get_var_label("RUIGZ", labels),
+  unit_label = get_unit_label("MIO_EUR", labels),
+  labels     = labels
+)
+```
+
+#### FBCF per settore costante
+
+```{r}
+#| label: cap-ts-roigz
+
+# 4. ROIGZ sector chart -----
+
+roigz_sec <- roigz[!is.na(SECTOR) & UNIT == "MIO_EUR2015"]
+ts_plotly_by_sector(
+  roigz_sec,
+  var_label  = get_var_label("ROIGZ", labels),
+  unit_label = get_unit_label("MIO_EUR2015", labels),
+  labels     = labels
+)
+```
+
+:::
+
+### Column {width="40%"}
+
+```{r}
+#| label: cap-map
+
+# Map: RUIGT MIO_EUR -----
+
+ruigt_map <- filter_data(ruigt, unit = "MIO_EUR")
+map_leaflet(
+  ruigt_map,
+  geo        = geo,
+  var_label  = get_var_label("RUIGT", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```
+
+## Row {height="30%"}
+
+```{r}
+#| label: cap-table
+
+# Table: RUIGT MIO_EUR -----
+
+ruigt_tbl <- filter_data(ruigt, unit = "MIO_EUR")
+summary_dt(
+  ruigt_tbl,
+  var_label  = get_var_label("RUIGT", labels),
+  unit_label = get_unit_label("MIO_EUR", labels)
+)
+```

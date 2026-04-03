@@ -98,7 +98,8 @@ filter_data <- function(
   unit = NULL,
   sex = NULL,
   age = NULL,
-  sector = NULL
+  sector = NULL,
+  isced11 = NULL
 ) {
   stopifnot(is.data.table(dt))
 
@@ -106,7 +107,8 @@ filter_data <- function(
     UNIT = unit,
     SEX = sex,
     AGE = age,
-    SECTOR = sector
+    SECTOR = sector,
+    ISCED11 = isced11
   )
 
   dt_cols <- names(dt)
@@ -290,8 +292,54 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
   dt_nuts3 <- dt[nchar(NUTSCODE) == 5L]
 
   if (nrow(dt_nuts3) == 0L) {
-    warning("No NUTS-3 data available for map.", call. = FALSE)
-    return(leaflet::leaflet() |> leaflet::addTiles())
+    # Fallback: show NUTS-2 regional polygon
+    dt_nuts2 <- dt[nchar(NUTSCODE) == 4L]
+    if (nrow(dt_nuts2) == 0L) {
+      return(leaflet::leaflet() |> leaflet::addTiles())
+    }
+    if (is.null(year)) {
+      year <- max(dt_nuts2$YEAR, na.rm = TRUE)
+    }
+    dt_year <- dt_nuts2[YEAR == year]
+    if (nrow(dt_year) == 0L) {
+      return(leaflet::leaflet() |> leaflet::addTiles())
+    }
+    geo_nuts2 <- geo[nchar(geo$NUTS_ID) == 4L, ]
+    geo_data <- merge(
+      geo_nuts2,
+      as.data.frame(dt_year[, list(NUTSCODE, VALUE)]),
+      by.x = "NUTS_ID",
+      by.y = "NUTSCODE",
+      all.x = TRUE
+    )
+    popup_text <- paste0(
+      "<strong>",
+      geo_data$NUTS_ID,
+      "</strong><br>",
+      geo_data$NAME_LATN,
+      "<br>",
+      var_label,
+      " (",
+      year,
+      "): ",
+      scales::comma(geo_data$VALUE, accuracy = 0.01)
+    )
+    return(
+      leaflet::leaflet(geo_data) |>
+        leaflet::addTiles() |>
+        leaflet::addPolygons(
+          fillColor = "#4292c6",
+          fillOpacity = 0.5,
+          weight = 1,
+          color = "#444444",
+          popup = popup_text,
+          highlightOptions = leaflet::highlightOptions(
+            weight = 2,
+            fillOpacity = 0.7,
+            bringToFront = TRUE
+          )
+        )
+    )
   }
 
   # Select year
@@ -510,15 +558,28 @@ ts_plotly_by_sector <- function(dt, var_label, unit_label, labels) {
 #'   optionally `sex`, `age`, `sector`.
 get_var_dimensions <- function(dt) {
   stopifnot(is.data.table(dt))
-  dims <- list(units = sort(unique(dt$UNIT)))
+
+  # Put "TOTAL" first so Shiny defaults to the aggregate value
+  total_first <- function(vals) {
+    if ("TOTAL" %in% vals) {
+      c("TOTAL", sort(setdiff(vals, "TOTAL")))
+    } else {
+      sort(vals)
+    }
+  }
+
+  dims <- list(units = total_first(unique(dt$UNIT)))
   if ("SEX" %in% names(dt)) {
-    dims$sex <- sort(unique(dt$SEX))
+    dims$sex <- total_first(unique(dt$SEX))
   }
   if ("AGE" %in% names(dt)) {
-    dims$age <- sort(unique(dt$AGE))
+    dims$age <- total_first(unique(dt$AGE))
   }
   if ("SECTOR" %in% names(dt)) {
     dims$sector <- sort(unique(dt[!is.na(SECTOR), SECTOR]))
+  }
+  if ("ISCED11" %in% names(dt)) {
+    dims$isced11 <- sort(unique(dt[!is.na(ISCED11), ISCED11]))
   }
   dims
 }
@@ -581,4 +642,14 @@ get_sector_label <- function(code, labels) {
     return(code)
   }
   labels$sector_labels$label_it[idx]
+}
+
+#' Restituisce l'etichetta italiana per il livello di istruzione ISCED.
+get_isced11_label <- function(code, labels) {
+  stopifnot(is.character(code), length(code) == 1L)
+  idx <- match(code, labels$isced11_labels$code)
+  if (is.na(idx)) {
+    return(code)
+  }
+  labels$isced11_labels$label_it[idx]
 }

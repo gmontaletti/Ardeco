@@ -24,7 +24,13 @@
       "Bash(mv index.qmd index.qmd.bak)",
       "Bash(rm -f _quarto.yml)",
       "Bash(rm -rf _site)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(pkill -f \"rmarkdown::run\")",
+      "Bash(pkill -f \"shiny\")",
+      "Bash(lsof -ti:5454 -ti:6399)",
+      "Bash(grep -E \"^d|\\\\.R$|\\\\.rds$|\\\\.parquet$\")",
+      "Bash(R:*)",
+      "Bash(grep -E \"^[A-Z].*[.]parquet$\")"
     ]
   }
 }

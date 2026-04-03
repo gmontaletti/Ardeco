@@ -92,7 +92,7 @@ dati <- ardeco_get_dataset_data(
   level     = "2",
   year      = "2010-2023",
   unit      = "Thousands Persons",
-  sector    = "O-U"  # totale economia
+  sector    = "O-U"  # PA, istruzione, sanità e altri servizi (sez. O-U)
 )
 
 # 4. Il risultato è un tibble pronto all'uso

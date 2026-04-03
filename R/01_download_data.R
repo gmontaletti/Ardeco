@@ -22,19 +22,29 @@ thematic_groups <- list(
   popolazione_demografia = c(
     "SNPTD",
     "SNPTN",
+    "SNPTZ",
+    "SNPTY",
     "SNPBN",
     "SNPDN",
+    "SNPDZ",
     "SNPNN",
     "SNMTN",
-    "SNPCN"
+    "SNPCN",
+    "SNPCNP",
+    "SNMTNP",
+    "SPPAN"
   ),
   mercato_lavoro = c(
     "SNETD",
+    "SNETDP",
     "SNWTD",
     "RNECN",
     "RNUTN",
     "RNLCN",
     "RNLHT",
+    "RNLHTP",
+    "RNLHTE",
+    "RNLHW",
     "RPECNP",
     "RPUCNP"
   ),
@@ -52,17 +62,43 @@ thematic_groups <- list(
     "SUVGDH",
     "SUVGDE",
     "SOVGDH",
-    "SOVGDE"
+    "SOVGDE",
+    "SUVGDP",
+    "SOVGDP",
+    "SPVGD",
+    "SPVGE"
   ),
   reddito_compensi = c(
     "RUWCD",
-    "ROWCD"
+    "ROWCD",
+    "RUWCDH",
+    "ROWCDH",
+    "RUWCDW",
+    "ROWCDW",
+    "RUWCDHH",
+    "RUWCDWE",
+    "RUWCZ",
+    "ROWCZ",
+    "RUVNH",
+    "RUYNH",
+    "RUONH",
+    "RUTYH"
   ),
   formazione_capitale = c(
     "RUIGT",
     "ROIGT",
     "RUIGZ",
-    "ROIGZ"
+    "ROIGZ",
+    "ROKND",
+    "SUKCT",
+    "SOKCT",
+    "SUKCZ",
+    "SOKCZ"
+  ),
+  istruzione = c(
+    "RPDTN",
+    "RPDEN",
+    "RPDNN"
   )
 )
 

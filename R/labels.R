@@ -10,17 +10,27 @@ var_labels <- data.table(
   var_code = c(
     "SNPTD",
     "SNPTN",
+    "SNPTZ",
+    "SNPTY",
     "SNPBN",
     "SNPDN",
+    "SNPDZ",
     "SNPNN",
     "SNMTN",
     "SNPCN",
+    "SNPCNP",
+    "SNMTNP",
+    "SPPAN",
     "SNETD",
+    "SNETDP",
     "SNWTD",
     "RNECN",
     "RNUTN",
     "RNLCN",
     "RNLHT",
+    "RNLHTP",
+    "RNLHTE",
+    "RNLHW",
     "RPECNP",
     "RPUCNP",
     "SNETZ",
@@ -35,27 +45,61 @@ var_labels <- data.table(
     "SUVGDE",
     "SOVGDH",
     "SOVGDE",
+    "SUVGDP",
+    "SOVGDP",
+    "SPVGD",
+    "SPVGE",
     "RUWCD",
     "ROWCD",
+    "RUWCDH",
+    "ROWCDH",
+    "RUWCDW",
+    "ROWCDW",
+    "RUWCDHH",
+    "RUWCDWE",
+    "RUWCZ",
+    "ROWCZ",
+    "RUVNH",
+    "RUYNH",
+    "RUONH",
+    "RUTYH",
     "RUIGT",
     "ROIGT",
     "RUIGZ",
-    "ROIGZ"
+    "ROIGZ",
+    "ROKND",
+    "SUKCT",
+    "SOKCT",
+    "SUKCZ",
+    "SOKCZ",
+    "RPDTN",
+    "RPDEN",
+    "RPDNN"
   ),
   label_it = c(
     "Popolazione media annua",
-    "Popolazione al 1\u00b0 gennaio per sesso ed et\u00e0",
+    "Popolazione al 1\u00b0 gennaio per fascia d\u2019et\u00e0 e sesso",
+    "Popolazione al 1\u00b0 gennaio per classi quinquennali e sesso",
+    "Popolazione al 1\u00b0 gennaio per anno di et\u00e0 e sesso",
     "Nati vivi per sesso",
     "Decessi per fascia d\u2019et\u00e0 e sesso",
+    "Decessi per classi quinquennali e sesso",
     "Variazione naturale della popolazione",
     "Migrazione netta per fascia d\u2019et\u00e0 e sesso",
     "Variazione della popolazione per fascia d\u2019et\u00e0 e sesso",
+    "Variazione della popolazione per 1000 abitanti",
+    "Migrazione netta per 1000 abitanti",
+    "Indice di dipendenza (rapporto alla popolazione 20-64)",
     "Occupazione workplace-based",
+    "Occupazione pro capite",
     "Dipendenti workplace-based",
     "Occupati per et\u00e0 e sesso",
     "Disoccupati",
     "Forza lavoro (15 anni e oltre)",
     "Ore lavorate (occupati)",
+    "Ore lavorate pro capite",
+    "Ore lavorate per occupato",
+    "Ore lavorate (dipendenti)",
     "Tasso di occupazione (20-64 anni)",
     "Tasso di disoccupazione (15-74 anni)",
     "Occupazione per settore NACE",
@@ -70,20 +114,45 @@ var_labels <- data.table(
     "Produttivit\u00e0 nominale per occupato",
     "Produttivit\u00e0 reale per ora lavorata",
     "Produttivit\u00e0 reale per occupato",
+    "PIL pro capite a prezzi correnti",
+    "PIL pro capite a prezzi costanti",
+    "Tasso di crescita del PIL (indice concatenato)",
+    "Tasso di crescita del VA (indice concatenato)",
     "Compensi dei dipendenti a prezzi correnti",
     "Compensi dei dipendenti a prezzi costanti",
+    "Compenso nominale per ora lavorata",
+    "Compenso reale per ora lavorata",
+    "Compenso nominale per dipendente",
+    "Compenso reale per dipendente",
+    "Costo del lavoro per unit\u00e0 di prodotto nominale (ore)",
+    "Costo del lavoro per unit\u00e0 di prodotto nominale (persone)",
+    "Compensi per settore a prezzi correnti",
+    "Compensi per settore a prezzi costanti",
+    "Reddito disponibile netto delle famiglie",
+    "Redditi netti da propriet\u00e0",
+    "Risultato netto di gestione e reddito misto",
+    "Imposte correnti su reddito e patrimonio",
     "Investimenti fissi lordi a prezzi correnti",
     "Investimenti fissi lordi a prezzi costanti",
     "Investimenti fissi lordi per settore a prezzi correnti",
-    "Investimenti fissi lordi per settore a prezzi costanti"
+    "Investimenti fissi lordi per settore a prezzi costanti",
+    "Stock di capitale a prezzi costanti",
+    "Ammortamenti a prezzi correnti",
+    "Ammortamenti a prezzi costanti",
+    "Ammortamenti per settore a prezzi correnti",
+    "Ammortamenti per settore a prezzi costanti",
+    "Popolazione per livello di istruzione",
+    "Abbandono precoce di istruzione e formazione (18-24 anni)",
+    "Giovani NEET (15-29 anni)"
   ),
   group_id = c(
-    rep("popolazione_demografia", 7),
-    rep("mercato_lavoro", 8),
+    rep("popolazione_demografia", 13),
+    rep("mercato_lavoro", 12),
     rep("occupazione_settore", 2),
-    rep("pil_valore_aggiunto", 10),
-    rep("reddito_compensi", 2),
-    rep("formazione_capitale", 4)
+    rep("pil_valore_aggiunto", 14),
+    rep("reddito_compensi", 14),
+    rep("formazione_capitale", 9),
+    rep("istruzione", 3)
   )
 )
 
@@ -164,7 +233,18 @@ age_labels <- data.table(
   )
 )
 
-# 5. Etichette settori NACE -----
+# 5. Etichette livelli di istruzione ISCED -----
+
+isced11_labels <- data.table(
+  code = c("ED0-2", "ED3_4", "ED5-8"),
+  label_it = c(
+    "Istruzione primaria e secondaria inferiore",
+    "Istruzione secondaria superiore e post-secondaria",
+    "Istruzione terziaria"
+  )
+)
+
+# 6. Etichette settori NACE -----
 
 sector_labels <- data.table(
   code = c(
@@ -194,12 +274,12 @@ sector_labels <- data.table(
     "Attivit\u00e0 immobiliari",
     "Attivit\u00e0 professionali, scientifiche e tecniche",
     "PA, istruzione, sanit\u00e0",
-    "Totale economia",
+    "PA, istruzione, sanit\u00e0 e altri servizi",
     "Altre attivit\u00e0 di servizi"
   )
 )
 
-# 6. Etichette gruppi tematici -----
+# 7. Etichette gruppi tematici -----
 
 group_labels <- data.table(
   group_id = c(
@@ -208,7 +288,8 @@ group_labels <- data.table(
     "occupazione_settore",
     "pil_valore_aggiunto",
     "reddito_compensi",
-    "formazione_capitale"
+    "formazione_capitale",
+    "istruzione"
   ),
   label_it = c(
     "Popolazione e demografia",
@@ -216,11 +297,12 @@ group_labels <- data.table(
     "Occupazione per settore",
     "PIL e valore aggiunto",
     "Reddito e compensi",
-    "Formazione del capitale"
+    "Formazione del capitale",
+    "Istruzione e capitale umano"
   )
 )
 
-# 7. Funzioni helper per recupero etichette -----
+# 8. Funzioni helper per recupero etichette -----
 
 #' Restituisce l'etichetta italiana di una variabile ARDECO.
 #'
@@ -292,13 +374,28 @@ get_sector_label <- function(code, labels) {
   labels$sector_labels$label_it[idx]
 }
 
-# 8. Salvataggio -----
+#' Restituisce l'etichetta italiana per il livello di istruzione ISCED.
+#'
+#' @param code character(1) codice ISCED (es. "ED5-8").
+#' @param labels lista caricata da labels.rds.
+#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
+get_isced11_label <- function(code, labels) {
+  stopifnot(is.character(code), length(code) == 1L)
+  idx <- match(code, labels$isced11_labels$code)
+  if (is.na(idx)) {
+    return(code)
+  }
+  labels$isced11_labels$label_it[idx]
+}
+
+# 9. Salvataggio -----
 
 labels <- list(
   var_labels = var_labels,
   unit_labels = unit_labels,
   sex_labels = sex_labels,
   age_labels = age_labels,
+  isced11_labels = isced11_labels,
   sector_labels = sector_labels,
   group_labels = group_labels
 )
@@ -317,5 +414,8 @@ message(
   " righe, ",
   "sector_labels: ",
   nrow(sector_labels),
+  " righe, ",
+  "isced11_labels: ",
+  nrow(isced11_labels),
   " righe)"
 )

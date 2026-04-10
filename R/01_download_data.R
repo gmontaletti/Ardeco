@@ -23,7 +23,6 @@ thematic_groups <- list(
     "SNPTD",
     "SNPTN",
     "SNPTZ",
-    "SNPTY",
     "SNPBN",
     "SNPDN",
     "SNPDZ",

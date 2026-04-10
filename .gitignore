@@ -1,6 +1,8 @@
 # Data files
 data/*.parquet
 data/*.gpkg
+data/*.duckdb
+data/*.duckdb.wal
 
 # Quarto output
 _site/

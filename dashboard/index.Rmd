@@ -35,7 +35,7 @@ load_variable_cached <- function(var_code) {
 PAGE_CONFIG <- list(
   popolazione_demografia = list(
     page_id = "pop",
-    vars    = c("SNPTD", "SNPTN", "SNPTZ", "SNPTY", "SNPBN", "SNPDN", "SNPDZ",
+    vars    = c("SNPTD", "SNPTN", "SNPTZ", "SNPBN", "SNPDN", "SNPDZ",
                 "SNPNN", "SNMTN", "SNPCN", "SNPCNP", "SNMTNP", "SPPAN"),
     vb1_var = "SNPTD", vb1_unit = "NR",    vb1_icon = "fa-users",      vb1_color = "primary",
     vb2_var = "SNPCN", vb2_unit = "GROWRT", vb2_icon = "fa-chart-line", vb2_color = "info",
@@ -50,8 +50,8 @@ PAGE_CONFIG <- list(
     page_id = "lab",
     vars    = c("RPECNP", "RPUCNP", "SNETD", "SNETDP", "SNWTD", "RNECN", "RNUTN",
                 "RNLCN", "RNLHT", "RNLHTP", "RNLHTE", "RNLHW"),
-    vb1_var = "RPECNP", vb1_unit = "PC",  vb1_icon = "fa-briefcase",  vb1_color = "success",
-    vb2_var = "RPUCNP", vb2_unit = "PC",  vb2_icon = "fa-user-times", vb2_color = "warning",
+    vb1_var = "RPECNP", vb1_unit = "PC",  vb1_icon = "fa-briefcase",  vb1_color = "primary",
+    vb2_var = "RPUCNP", vb2_unit = "PC",  vb2_icon = "fa-user-times", vb2_color = "info",
     vb1_filter = list(unit = "PC"),
     vb2_filter = list(unit = "PC"),
     vb1_title  = "Tasso di occupazione (Lombardia)",
@@ -77,7 +77,7 @@ PAGE_CONFIG <- list(
     vars    = c("SUVGD", "SOVGD", "SUVGE", "SOVGE", "SUVGZ", "SOVGZ",
                 "SUVGDH", "SUVGDE", "SOVGDH", "SOVGDE",
                 "SUVGDP", "SOVGDP", "SPVGD", "SPVGE"),
-    vb1_var = "SUVGD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-euro-sign", vb1_color = "success",
+    vb1_var = "SUVGD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-euro-sign", vb1_color = "primary",
     vb2_var = "SOVGD", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-chart-bar", vb2_color = "info",
     vb1_filter = list(unit = "MIO_EUR"),
     vb2_filter = list(unit = "MIO_EUR2015"),
@@ -104,7 +104,7 @@ PAGE_CONFIG <- list(
     page_id = "cap",
     vars    = c("RUIGT", "ROIGT", "RUIGZ", "ROIGZ",
                 "ROKND", "SUKCT", "SOKCT", "SUKCZ", "SOKCZ"),
-    vb1_var = "RUIGT", vb1_unit = "MIO_EUR",     vb1_icon = "fa-hammer", vb1_color = "success",
+    vb1_var = "RUIGT", vb1_unit = "MIO_EUR",     vb1_icon = "fa-hammer", vb1_color = "primary",
     vb2_var = "ROIGT", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-tools",  vb2_color = "info",
     vb1_filter = list(unit = "MIO_EUR"),
     vb2_filter = list(unit = "MIO_EUR2015"),
@@ -116,7 +116,7 @@ PAGE_CONFIG <- list(
   istruzione = list(
     page_id = "edu",
     vars    = c("RPDTN", "RPDEN", "RPDNN"),
-    vb1_var = "RPDEN", vb1_unit = "PC",  vb1_icon = "fa-graduation-cap", vb1_color = "warning",
+    vb1_var = "RPDEN", vb1_unit = "PC",  vb1_icon = "fa-graduation-cap", vb1_color = "primary",
     vb2_var = "RPDNN", vb2_unit = "PC",  vb2_icon = "fa-user-clock",     vb2_color = "danger",
     vb1_filter = list(unit = "PC"),
     vb2_filter = list(unit = "PC"),
@@ -198,6 +198,16 @@ make_page_server <- function(page_id, group_id, input, output, session) {
       vapply(dims$isced11, get_isced11_label, character(1L), labels = LABELS)
     )
     selectInput(paste0(page_id, "_isced11"), "Livello di istruzione", choices = choices)
+  })
+
+  output[[paste0(page_id, "_desc_ui")]] <- renderUI({
+    req(input[[paste0(page_id, "_var")]])
+    desc <- get_var_description(input[[paste0(page_id, "_var")]], LABELS)
+    if (is.null(desc)) return(NULL)
+    tags$div(
+      class = "var-description",
+      tags$p(desc)
+    )
   })
 
   # -- Reactive: filtered data --
@@ -299,7 +309,7 @@ make_page_server <- function(page_id, group_id, input, output, session) {
         )))
     }
     ensure_unique(dt_filt)
-    ts_plotly_regional(dt_filt, var_label, unit_label)
+    ts_plotly_regional(dt_filt, var_label, unit_label, geo = GEO)
   })
 
   # -- Leaflet map --
@@ -309,7 +319,20 @@ make_page_server <- function(page_id, group_id, input, output, session) {
     dt_filt    <- rv_filtered()
 
     if (nrow(dt_filt) == 0L) {
-      return(leaflet::leaflet() |> leaflet::addTiles())
+      return(
+        leaflet::leaflet() |>
+          leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+          leaflet::fitBounds(8.49, 44.68, 11.43, 46.64) |>
+          htmlwidgets::onRender("
+            function(el, x) {
+              var map = this;
+              setTimeout(function() {
+                map.invalidateSize();
+                map.fitBounds([[44.68, 8.49], [46.64, 11.43]]);
+              }, 200);
+            }
+          ")
+      )
     }
 
     # For sector vars, include selected sector name in the map label
@@ -342,6 +365,7 @@ uiOutput("pop_sex_ui")
 uiOutput("pop_age_ui")
 uiOutput("pop_sector_ui")
 uiOutput("pop_isced11_ui")
+uiOutput("pop_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -390,6 +414,7 @@ uiOutput("lab_sex_ui")
 uiOutput("lab_age_ui")
 uiOutput("lab_sector_ui")
 uiOutput("lab_isced11_ui")
+uiOutput("lab_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -438,6 +463,7 @@ uiOutput("sec_sex_ui")
 uiOutput("sec_age_ui")
 uiOutput("sec_sector_ui")
 uiOutput("sec_isced11_ui")
+uiOutput("sec_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -486,6 +512,7 @@ uiOutput("gdp_sex_ui")
 uiOutput("gdp_age_ui")
 uiOutput("gdp_sector_ui")
 uiOutput("gdp_isced11_ui")
+uiOutput("gdp_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -534,6 +561,7 @@ uiOutput("inc_sex_ui")
 uiOutput("inc_age_ui")
 uiOutput("inc_sector_ui")
 uiOutput("inc_isced11_ui")
+uiOutput("inc_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -582,6 +610,7 @@ uiOutput("cap_sex_ui")
 uiOutput("cap_age_ui")
 uiOutput("cap_sector_ui")
 uiOutput("cap_isced11_ui")
+uiOutput("cap_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -629,6 +658,7 @@ uiOutput("edu_sex_ui")
 uiOutput("edu_age_ui")
 uiOutput("edu_sector_ui")
 uiOutput("edu_isced11_ui")
+uiOutput("edu_desc_ui")
 ```
 
 ## Row {data-height=120}
@@ -668,6 +698,45 @@ for (gid in names(PAGE_CONFIG)) {
     group_id <- gid
     pid <- PAGE_CONFIG[[group_id]]$page_id
     make_page_server(pid, group_id, input, output, session)
+    outputOptions(output, paste0(pid, "_map"), suspendWhenHidden = FALSE)
   })
 }
+
+# 2. Fix leaflet maps in hidden tabs -----
+# flexdashboard pages are Bootstrap tabs; hidden tabs have zero-dimension
+# containers causing leaflet to miscalculate bounds. Invalidate map size
+# and re-fit to Lombardia when a tab becomes visible.
+
+shiny::insertUI(
+  selector = "head",
+  where = "beforeEnd",
+  ui = tags$script(HTML("
+    $(document).on('shown.bs.tab', function(e) {
+      setTimeout(function() {
+        $('.leaflet').each(function() {
+          var map = $(this).data('leaflet-map') || HTMLWidgets.find('#' + this.id);
+          if (map && map.invalidateSize) {
+            map.invalidateSize();
+            map.fitBounds([[44.68, 8.49], [46.64, 11.43]]);
+          }
+        });
+      }, 150);
+    });
+  "))
+)
+
+shiny::insertUI(
+  selector = "head",
+  where = "beforeEnd",
+  ui = tags$style(HTML("
+    .var-description {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #ddd;
+      font-size: 0.85em;
+      color: #555;
+      line-height: 1.4;
+    }
+  "))
+)
 ```

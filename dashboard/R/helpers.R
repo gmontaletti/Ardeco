@@ -167,7 +167,13 @@ ensure_unique <- function(dt, by_cols = c("NUTSCODE", "YEAR")) {
 #' @param nuts2_code Character. NUTS-2 code for the regional total
 #'   (default "ITC4" for Lombardia).
 #' @return A plotly object.
-ts_plotly_regional <- function(dt, var_label, unit_label, nuts2_code = "ITC4") {
+ts_plotly_regional <- function(
+  dt,
+  var_label,
+  unit_label,
+  nuts2_code = "ITC4",
+  geo = NULL
+) {
   stopifnot(
     is.data.table(dt),
     is.character(var_label),
@@ -198,13 +204,38 @@ ts_plotly_regional <- function(dt, var_label, unit_label, nuts2_code = "ITC4") {
   setorder(nuts2, YEAR)
   setorder(nuts3, NUTSCODE, YEAR)
 
-  # Province palette
+  # NUTS code -> name lookup from geo object
+  nuts_to_name <- character(0)
+  if (!is.null(geo)) {
+    nuts_to_name <- setNames(geo$NAME_LATN, geo$NUTS_ID)
+  }
+  lookup_name <- function(code) {
+    nm <- nuts_to_name[code]
+    if (is.na(nm) || is.null(nm)) code else nm
+  }
+
+  # CVD-safe province palette: Paul Tol Muted (9) + Okabe-Ito supplements (3)
+  cvd_palette <- c(
+    "#CC6677",
+    "#332288",
+    "#DDCC77",
+    "#117733",
+    "#88CCEE",
+    "#882255",
+    "#44AA99",
+    "#999933",
+    "#AA4499",
+    "#E69F00",
+    "#56B4E9",
+    "#D55E00"
+  )
+  # Redundant encoding: dash patterns cycle every 4 provinces
+  cvd_dashes <- rep(c("solid", "dash", "dot", "dashdot"), length.out = 12L)
+
   province_codes <- sort(unique(nuts3$NUTSCODE))
   n_prov <- length(province_codes)
-  if (n_prov > 0L) {
-    pal_n <- max(3L, min(n_prov, 12L))
-    prov_colors <- RColorBrewer::brewer.pal(pal_n, "Set3")[seq_len(n_prov)]
-  }
+  prov_colors <- cvd_palette[seq_len(n_prov)]
+  prov_dashes <- cvd_dashes[seq_len(n_prov)]
 
   # Build plotly figure
 
@@ -219,12 +250,11 @@ ts_plotly_regional <- function(dt, var_label, unit_label, nuts2_code = "ITC4") {
         y = ~VALUE,
         type = "scatter",
         mode = "lines",
-        name = paste0(nuts2_code, " (regione)"),
-        line = list(width = 3, color = "#d62728"),
+        name = lookup_name(nuts2_code),
+        line = list(width = 3, color = "#000000"),
         visible = TRUE,
         hovertemplate = paste0(
-          nuts2_code,
-          " (regione)",
+          lookup_name(nuts2_code),
           "<br>Anno: %{x}<br>Valore: %{y:,.2f}<extra></extra>"
         )
       )
@@ -242,11 +272,11 @@ ts_plotly_regional <- function(dt, var_label, unit_label, nuts2_code = "ITC4") {
           y = ~VALUE,
           type = "scatter",
           mode = "lines",
-          name = prov_code,
-          line = list(width = 1.5, color = prov_colors[i]),
+          name = lookup_name(prov_code),
+          line = list(width = 2, color = prov_colors[i], dash = prov_dashes[i]),
           visible = "legendonly",
           hovertemplate = paste0(
-            prov_code,
+            lookup_name(prov_code),
             "<br>Anno: %{x}<br>Valore: %{y:,.2f}<extra></extra>"
           )
         )
@@ -288,6 +318,23 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
     length(unit_label) == 1L
   )
 
+  # Lombardia bounding box (EPSG:4326)
+  LOM_LNG1 <- 8.49
+  LOM_LNG2 <- 11.43
+  LOM_LAT1 <- 44.68
+  LOM_LAT2 <- 46.64
+
+  # JS to fix map rendering in hidden flexdashboard tabs
+  js_invalidate <- "
+    function(el, x) {
+      var map = this;
+      setTimeout(function() {
+        map.invalidateSize();
+        map.fitBounds([[44.68, 8.49], [46.64, 11.43]]);
+      }, 200);
+    }
+  "
+
   # Keep only NUTS-3 rows
   dt_nuts3 <- dt[nchar(NUTSCODE) == 5L]
 
@@ -295,14 +342,24 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
     # Fallback: show NUTS-2 regional polygon
     dt_nuts2 <- dt[nchar(NUTSCODE) == 4L]
     if (nrow(dt_nuts2) == 0L) {
-      return(leaflet::leaflet() |> leaflet::addTiles())
+      return(
+        leaflet::leaflet() |>
+          leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+          leaflet::fitBounds(LOM_LNG1, LOM_LAT1, LOM_LNG2, LOM_LAT2) |>
+          htmlwidgets::onRender(js_invalidate)
+      )
     }
     if (is.null(year)) {
       year <- max(dt_nuts2$YEAR, na.rm = TRUE)
     }
     dt_year <- dt_nuts2[YEAR == year]
     if (nrow(dt_year) == 0L) {
-      return(leaflet::leaflet() |> leaflet::addTiles())
+      return(
+        leaflet::leaflet() |>
+          leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+          leaflet::fitBounds(LOM_LNG1, LOM_LAT1, LOM_LNG2, LOM_LAT2) |>
+          htmlwidgets::onRender(js_invalidate)
+      )
     }
     geo_nuts2 <- geo[nchar(geo$NUTS_ID) == 4L, ]
     geo_data <- merge(
@@ -326,19 +383,21 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
     )
     return(
       leaflet::leaflet(geo_data) |>
-        leaflet::addTiles() |>
+        leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+        leaflet::fitBounds(LOM_LNG1, LOM_LAT1, LOM_LNG2, LOM_LAT2) |>
         leaflet::addPolygons(
-          fillColor = "#4292c6",
-          fillOpacity = 0.5,
+          fillColor = "#2171b5",
+          fillOpacity = 0.7,
           weight = 1,
-          color = "#444444",
+          color = "#333333",
           popup = popup_text,
           highlightOptions = leaflet::highlightOptions(
             weight = 2,
             fillOpacity = 0.7,
             bringToFront = TRUE
           )
-        )
+        ) |>
+        htmlwidgets::onRender(js_invalidate)
     )
   }
 
@@ -355,7 +414,12 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
       ".",
       call. = FALSE
     )
-    return(leaflet::leaflet() |> leaflet::addTiles())
+    return(
+      leaflet::leaflet() |>
+        leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+        leaflet::fitBounds(LOM_LNG1, LOM_LAT1, LOM_LNG2, LOM_LAT2) |>
+        htmlwidgets::onRender(js_invalidate)
+    )
   }
 
   # Join data to geometry
@@ -391,19 +455,21 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
   )
 
   leaflet::leaflet(geo_data) |>
-    leaflet::addTiles() |>
+    leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+    leaflet::fitBounds(LOM_LNG1, LOM_LAT1, LOM_LNG2, LOM_LAT2) |>
     leaflet::addPolygons(
       fillColor = ~ pal(VALUE),
-      fillOpacity = 0.7,
+      fillOpacity = 0.8,
       weight = 1,
-      color = "#444444",
+      color = "#333333",
       popup = popup_text,
       highlightOptions = leaflet::highlightOptions(
         weight = 2,
         fillOpacity = 0.9,
         bringToFront = TRUE
       )
-    )
+    ) |>
+    htmlwidgets::onRender(js_invalidate)
 }
 
 # 6. DT summary table -----
@@ -533,6 +599,22 @@ ts_plotly_by_sector <- function(dt, var_label, unit_label, labels) {
     )
   ) +
     ggplot2::geom_line(linewidth = 0.6) +
+    ggplot2::scale_color_manual(
+      values = c(
+        "#CC6677",
+        "#332288",
+        "#DDCC77",
+        "#117733",
+        "#88CCEE",
+        "#882255",
+        "#44AA99",
+        "#999933",
+        "#AA4499",
+        "#E69F00",
+        "#56B4E9",
+        "#D55E00"
+      )
+    ) +
     ggplot2::labs(
       title = paste(var_label, "per settore"),
       x = NULL,
@@ -652,4 +734,22 @@ get_isced11_label <- function(code, labels) {
     return(code)
   }
   labels$isced11_labels$label_it[idx]
+}
+
+#' Restituisce la descrizione italiana di una variabile ARDECO.
+#'
+#' @param code character(1) codice variabile (es. "SUVGD").
+#' @param labels lista caricata da labels.rds.
+#' @return character(1) descrizione italiana, oppure NULL se non trovata.
+get_var_description <- function(code, labels) {
+  stopifnot(is.character(code), length(code) == 1L)
+  row <- labels$var_labels[var_code == code]
+  if (
+    nrow(row) == 0L ||
+      !("description_it" %in% names(row)) ||
+      is.na(row$description_it)
+  ) {
+    return(NULL)
+  }
+  row$description_it
 }

@@ -1,10 +1,120 @@
-# labels.R
-# Lookup tables con etichette italiane per il progetto ARDECO dashboard.
-# Salva tutte le tabelle in data/labels.rds come lista nominata.
+# ==============================================================================
+# 03_build_duckdb.R
+# Scarica tutte le variabili ARDECO e le archivia in un database DuckDB.
+# Output: data/ardeco.duckdb
+# ==============================================================================
 
+# 1. Librerie -----
+
+library(ARDECO)
 library(data.table)
+library(duckdb)
+library(DBI)
+library(R.utils)
 
-# 1. Etichette variabili -----
+# 2. Configurazione -----
+
+DB_PATH <- "data/ardeco.duckdb"
+NUTSCODE <- "ITC4"
+LEVEL <- "2,3"
+VERSION <- 2024
+
+# 3. Gruppi tematici -----
+
+thematic_groups <- list(
+  popolazione_demografia = c(
+    "SNPTD",
+    "SNPTN",
+    "SNPTZ",
+    "SNPBN",
+    "SNPDN",
+    "SNPDZ",
+    "SNPNN",
+    "SNMTN",
+    "SNPCN",
+    "SNPCNP",
+    "SNMTNP",
+    "SPPAN"
+  ),
+  mercato_lavoro = c(
+    "SNETD",
+    "SNETDP",
+    "SNWTD",
+    "RNECN",
+    "RNUTN",
+    "RNLCN",
+    "RNLHT",
+    "RNLHTP",
+    "RNLHTE",
+    "RNLHW",
+    "RPECNP",
+    "RPUCNP"
+  ),
+  occupazione_settore = c(
+    "SNETZ",
+    "RNLHZ"
+  ),
+  pil_valore_aggiunto = c(
+    "SUVGD",
+    "SOVGD",
+    "SUVGE",
+    "SOVGE",
+    "SUVGZ",
+    "SOVGZ",
+    "SUVGDH",
+    "SUVGDE",
+    "SOVGDH",
+    "SOVGDE",
+    "SUVGDP",
+    "SOVGDP",
+    "SPVGD",
+    "SPVGE"
+  ),
+  reddito_compensi = c(
+    "RUWCD",
+    "ROWCD",
+    "RUWCDH",
+    "ROWCDH",
+    "RUWCDW",
+    "ROWCDW",
+    "RUWCDHH",
+    "RUWCDWE",
+    "RUWCZ",
+    "ROWCZ",
+    "RUVNH",
+    "RUYNH",
+    "RUONH",
+    "RUTYH"
+  ),
+  formazione_capitale = c(
+    "RUIGT",
+    "ROIGT",
+    "RUIGZ",
+    "ROIGZ",
+    "ROKND",
+    "SUKCT",
+    "SOKCT",
+    "SUKCZ",
+    "SOKCZ"
+  ),
+  istruzione = c(
+    "RPDTN",
+    "RPDEN",
+    "RPDNN"
+  )
+)
+
+# Lookup inverso: da codice variabile a gruppo tematico
+var_to_group <- character(0)
+for (gn in names(thematic_groups)) {
+  for (vc in thematic_groups[[gn]]) {
+    var_to_group[vc] <- gn
+  }
+}
+
+all_vars <- unique(unlist(thematic_groups, use.names = FALSE))
+
+# 4. Tabelle etichette -----
 
 var_labels <- data.table(
   var_code = c(
@@ -229,8 +339,6 @@ var_labels <- data.table(
   )
 )
 
-# 2. Etichette unità di misura -----
-
 unit_labels <- data.table(
   code = c(
     "NR",
@@ -270,14 +378,10 @@ unit_labels <- data.table(
   )
 )
 
-# 3. Etichette sesso -----
-
 sex_labels <- data.table(
   code = c("TOTAL", "F", "M"),
   label_it = c("Totale", "Femmine", "Maschi")
 )
-
-# 4. Etichette classi di età -----
 
 age_labels <- data.table(
   code = c(
@@ -306,8 +410,6 @@ age_labels <- data.table(
   )
 )
 
-# 5. Etichette livelli di istruzione ISCED -----
-
 isced11_labels <- data.table(
   code = c("ED0-2", "ED3_4", "ED5-8"),
   label_it = c(
@@ -316,8 +418,6 @@ isced11_labels <- data.table(
     "Istruzione terziaria"
   )
 )
-
-# 6. Etichette settori NACE -----
 
 sector_labels <- data.table(
   code = c(
@@ -352,8 +452,6 @@ sector_labels <- data.table(
   )
 )
 
-# 7. Etichette gruppi tematici -----
-
 group_labels <- data.table(
   group_id = c(
     "popolazione_demografia",
@@ -375,120 +473,240 @@ group_labels <- data.table(
   )
 )
 
-# 8. Funzioni helper per recupero etichette -----
+# 5. Funzione download -----
 
-#' Restituisce l'etichetta italiana di una variabile ARDECO.
+#' Download a single ARDECO variable with normalized schema.
 #'
-#' @param code character(1) codice variabile (es. "SUVGD").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_var_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  row <- labels$var_labels[var_code == code]
-  if (nrow(row) == 0L) {
-    return(code)
-  }
-  row$label_it
+#' Wraps ardeco_get_dataset_data() with error handling and column normalization.
+#' Returns a data.table with a consistent 12-column schema on success, or NULL
+#' on failure.
+#'
+#' @param var_code Character. ARDECO variable code.
+#' @param nutscode Character. NUTS code filter (default "ITC4" for Lombardia).
+#' @param level Character. NUTS levels to retrieve (default "2,3").
+#' @param version Numeric. NUTS version year (default 2024).
+#' @return A data.table with 12 columns or NULL on failure.
+download_variable <- function(
+  var_code,
+  nutscode = "ITC4",
+  level = "2,3",
+  version = 2024,
+  timeout_sec = 300
+) {
+  tryCatch(
+    {
+      dl <- R.utils::withTimeout(
+        ardeco_get_dataset_data(
+          var_code,
+          nutscode = nutscode,
+          level = level,
+          version = version
+        ),
+        timeout = timeout_sec
+      )
+      if (is.null(dl) || nrow(dl) == 0L) {
+        message("  [WARN] No data returned for ", var_code)
+        return(NULL)
+      }
+      dt <- as.data.table(dl)
+
+      # Normalizzazione colonne opzionali
+      for (col in c("SEX", "AGE", "SECTOR", "ISCED11")) {
+        if (!col %in% names(dt)) {
+          set(dt, j = col, value = NA_character_)
+        }
+      }
+
+      # Gruppo tematico
+      set(dt, j = "THEMATIC_GROUP", value = var_to_group[var_code])
+
+      # Conversione tipi
+      if (!is.double(dt[["VALUE"]])) {
+        set(dt, j = "VALUE", value = as.double(dt[["VALUE"]]))
+      }
+      if (!is.integer(dt[["YEAR"]])) {
+        set(dt, j = "YEAR", value = as.integer(dt[["YEAR"]]))
+      }
+      if (!is.integer(dt[["LEVEL"]])) {
+        set(dt, j = "LEVEL", value = as.integer(dt[["LEVEL"]]))
+      }
+      if (!is.integer(dt[["VERSIONS"]])) {
+        set(dt, j = "VERSIONS", value = as.integer(dt[["VERSIONS"]]))
+      }
+
+      # Schema a 12 colonne in ordine fisso
+      dt[, list(
+        VARIABLE,
+        VERSIONS,
+        LEVEL,
+        NUTSCODE,
+        YEAR,
+        UNIT,
+        VALUE,
+        SEX,
+        AGE,
+        SECTOR,
+        ISCED11,
+        THEMATIC_GROUP
+      )]
+    },
+    TimeoutException = function(e) {
+      message("  [TIMEOUT] ", var_code, " exceeded ", timeout_sec, "s")
+      NULL
+    },
+    error = function(e) {
+      message(
+        "  [ERROR] Failed to download ",
+        var_code,
+        ": ",
+        conditionMessage(e)
+      )
+      NULL
+    }
+  )
 }
 
-#' Restituisce l'etichetta italiana di un'unità di misura ARDECO.
-#'
-#' @param code character(1) codice unità (es. "MIO_EUR").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_unit_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$unit_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$unit_labels$label_it[idx]
+# 6. Inizializzazione DuckDB -----
+
+if (file.exists(DB_PATH)) {
+  file.remove(DB_PATH)
+  message("Rimosso database esistente: ", DB_PATH)
 }
 
-#' Restituisce l'etichetta italiana per il sesso.
-#'
-#' @param code character(1) codice sesso (es. "F", "M", "TOTAL").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_sex_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$sex_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$sex_labels$label_it[idx]
-}
+con <- dbConnect(duckdb(), dbdir = DB_PATH)
+on.exit(dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
-#' Restituisce l'etichetta italiana per la classe di età.
-#'
-#' @param code character(1) codice classe di età (es. "Y15-64").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_age_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$age_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$age_labels$label_it[idx]
-}
-
-#' Restituisce l'etichetta italiana per il settore NACE.
-#'
-#' @param code character(1) codice settore (es. "B-E", "O-U").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_sector_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$sector_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$sector_labels$label_it[idx]
-}
-
-#' Restituisce l'etichetta italiana per il livello di istruzione ISCED.
-#'
-#' @param code character(1) codice ISCED (es. "ED5-8").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_isced11_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$isced11_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$isced11_labels$label_it[idx]
-}
-
-# 9. Salvataggio -----
-
-labels <- list(
-  var_labels = var_labels,
-  unit_labels = unit_labels,
-  sex_labels = sex_labels,
-  age_labels = age_labels,
-  isced11_labels = isced11_labels,
-  sector_labels = sector_labels,
-  group_labels = group_labels
+dbExecute(
+  con,
+  "
+  CREATE TABLE ardeco_data (
+    VARIABLE       VARCHAR NOT NULL,
+    VERSIONS       INTEGER,
+    LEVEL          INTEGER,
+    NUTSCODE       VARCHAR NOT NULL,
+    YEAR           INTEGER NOT NULL,
+    UNIT           VARCHAR,
+    VALUE          DOUBLE,
+    SEX            VARCHAR,
+    AGE            VARCHAR,
+    SECTOR         VARCHAR,
+    ISCED11        VARCHAR,
+    THEMATIC_GROUP VARCHAR NOT NULL
+  )
+"
 )
 
-saveRDS(labels, "data/labels.rds")
+variable_list <- as.data.table(ardeco_get_variable_list())
+dbWriteTable(con, "variable_list", variable_list, overwrite = TRUE)
+message("Tabella variable_list: ", nrow(variable_list), " righe")
 
-message(
-  "Salvate ",
-  length(labels),
-  " tabelle in data/labels.rds ",
-  "(var_labels: ",
-  nrow(var_labels),
-  " righe, ",
-  "unit_labels: ",
-  nrow(unit_labels),
-  " righe, ",
-  "sector_labels: ",
-  nrow(sector_labels),
-  " righe, ",
-  "isced11_labels: ",
-  nrow(isced11_labels),
-  " righe)"
+# 7. Loop principale -----
+
+message("\nDownloading ", length(all_vars), " variables\n")
+
+# Pre-allocate summary log
+summary_log <- data.table(
+  var_code = character(length(all_vars)),
+  group = character(length(all_vars)),
+  n_rows = integer(length(all_vars)),
+  status = character(length(all_vars)),
+  elapsed_sec = numeric(length(all_vars))
 )
+
+t0_total <- proc.time()
+
+for (i in seq_along(all_vars)) {
+  vc <- all_vars[i]
+  gn <- var_to_group[vc]
+  message(sprintf("[%2d/%d] %s (%s)", i, length(all_vars), vc, gn))
+
+  t0 <- proc.time()
+  dt <- download_variable(vc)
+  elapsed <- (proc.time() - t0)[["elapsed"]]
+
+  if (!is.null(dt)) {
+    dbWriteTable(con, "ardeco_data", dt, append = TRUE)
+    message(sprintf("  Inserted %d rows (%.1fs)", nrow(dt), elapsed))
+
+    set(summary_log, i, "var_code", vc)
+    set(summary_log, i, "group", gn)
+    set(summary_log, i, "n_rows", nrow(dt))
+    set(summary_log, i, "status", "OK")
+    set(summary_log, i, "elapsed_sec", elapsed)
+  } else {
+    set(summary_log, i, "var_code", vc)
+    set(summary_log, i, "group", gn)
+    set(summary_log, i, "n_rows", 0L)
+    set(summary_log, i, "status", "FAILED")
+    set(summary_log, i, "elapsed_sec", elapsed)
+  }
+}
+
+# Creazione indici
+dbExecute(con, "CREATE INDEX idx_variable ON ardeco_data (VARIABLE)")
+dbExecute(con, "CREATE INDEX idx_nuts_year ON ardeco_data (NUTSCODE, YEAR)")
+
+# 8. Scrittura tabelle etichette -----
+
+dbWriteTable(con, "var_labels", var_labels, overwrite = TRUE)
+dbWriteTable(con, "unit_labels", unit_labels, overwrite = TRUE)
+dbWriteTable(con, "sex_labels", sex_labels, overwrite = TRUE)
+dbWriteTable(con, "age_labels", age_labels, overwrite = TRUE)
+dbWriteTable(con, "isced11_labels", isced11_labels, overwrite = TRUE)
+dbWriteTable(con, "sector_labels", sector_labels, overwrite = TRUE)
+dbWriteTable(con, "group_labels", group_labels, overwrite = TRUE)
+dbWriteTable(con, "download_log", summary_log, overwrite = TRUE)
+message("Tabelle etichette e log scritte nel database")
+
+# 9. Riepilogo -----
+
+message("\n========== Download summary ==========")
+for (i in seq_len(nrow(summary_log))) {
+  row <- summary_log[i]
+  msg <- sprintf(
+    "  %-6s | %-25s | %7d rows | %6.1fs | %s",
+    row$var_code,
+    row$group,
+    row$n_rows,
+    row$elapsed_sec,
+    row$status
+  )
+  message(msg)
+}
+
+n_ok <- summary_log[status == "OK", .N]
+n_failed <- summary_log[status == "FAILED", .N]
+
+message(sprintf(
+  "\nTotal: %d OK, %d FAILED out of %d variables.",
+  n_ok,
+  n_failed,
+  nrow(summary_log)
+))
+
+if (n_failed > 0L) {
+  failed_vars <- summary_log[status == "FAILED", var_code]
+  message("Failed variables: ", paste(failed_vars, collapse = ", "))
+} else {
+  message("All variables downloaded successfully.")
+}
+
+# Verifica DuckDB
+row_count <- dbGetQuery(con, "SELECT COUNT(*) AS n FROM ardeco_data")$n
+var_count <- dbGetQuery(
+  con,
+  "SELECT COUNT(DISTINCT VARIABLE) AS n FROM ardeco_data"
+)$n
+tbl_list <- dbGetQuery(con, "SHOW TABLES")
+
+message(sprintf("\nDuckDB: %s", DB_PATH))
+message(sprintf("  Tabelle: %s", paste(tbl_list[[1]], collapse = ", ")))
+message(sprintf("  ardeco_data: %d righe, %d variabili", row_count, var_count))
+message(sprintf("  Dimensione file: %.1f MB", file.size(DB_PATH) / 1e6))
+
+total_elapsed <- (proc.time() - t0_total)[["elapsed"]]
+message(sprintf(
+  "  Tempo totale: %.0f secondi (%.1f minuti)",
+  total_elapsed,
+  total_elapsed / 60
+))

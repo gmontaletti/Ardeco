@@ -77,11 +77,7 @@ thematic_groups <- list(
     "RUWCDHH",
     "RUWCDWE",
     "RUWCZ",
-    "ROWCZ",
-    "RUVNH",
-    "RUYNH",
-    "RUONH",
-    "RUTYH"
+    "ROWCZ"
   ),
   formazione_capitale = c(
     "RUIGT",
@@ -93,11 +89,6 @@ thematic_groups <- list(
     "SOKCT",
     "SUKCZ",
     "SOKCZ"
-  ),
-  istruzione = c(
-    "RPDTN",
-    "RPDEN",
-    "RPDNN"
   )
 )
 

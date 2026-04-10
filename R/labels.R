@@ -58,10 +58,6 @@ var_labels <- data.table(
     "RUWCDWE",
     "RUWCZ",
     "ROWCZ",
-    "RUVNH",
-    "RUYNH",
-    "RUONH",
-    "RUTYH",
     "RUIGT",
     "ROIGT",
     "RUIGZ",
@@ -70,10 +66,7 @@ var_labels <- data.table(
     "SUKCT",
     "SOKCT",
     "SUKCZ",
-    "SOKCZ",
-    "RPDTN",
-    "RPDEN",
-    "RPDNN"
+    "SOKCZ"
   ),
   label_it = c(
     "Popolazione media annua",
@@ -126,10 +119,6 @@ var_labels <- data.table(
     "Costo del lavoro per unit\u00e0 di prodotto nominale (persone)",
     "Compensi per settore a prezzi correnti",
     "Compensi per settore a prezzi costanti",
-    "Reddito disponibile netto delle famiglie",
-    "Redditi netti da propriet\u00e0",
-    "Risultato netto di gestione e reddito misto",
-    "Imposte correnti su reddito e patrimonio",
     "Investimenti fissi lordi a prezzi correnti",
     "Investimenti fissi lordi a prezzi costanti",
     "Investimenti fissi lordi per settore a prezzi correnti",
@@ -138,19 +127,15 @@ var_labels <- data.table(
     "Ammortamenti a prezzi correnti",
     "Ammortamenti a prezzi costanti",
     "Ammortamenti per settore a prezzi correnti",
-    "Ammortamenti per settore a prezzi costanti",
-    "Popolazione per livello di istruzione",
-    "Abbandono precoce di istruzione e formazione (18-24 anni)",
-    "Giovani NEET (15-29 anni)"
+    "Ammortamenti per settore a prezzi costanti"
   ),
   group_id = c(
     rep("popolazione_demografia", 12),
     rep("mercato_lavoro", 12),
     rep("occupazione_settore", 2),
     rep("pil_valore_aggiunto", 14),
-    rep("reddito_compensi", 14),
-    rep("formazione_capitale", 9),
-    rep("istruzione", 3)
+    rep("reddito_compensi", 10),
+    rep("formazione_capitale", 9)
   ),
   description_it = c(
     # Popolazione e demografia (12)
@@ -197,7 +182,7 @@ var_labels <- data.table(
     "PIL pro capite a prezzi costanti (PIL reale / popolazione media annua). Indicatore derivato.",
     "Tasso di crescita del PIL, calcolato come indice concatenato in volume. Indicatore derivato.",
     "Tasso di crescita del valore aggiunto, calcolato come indice concatenato in volume. Indicatore derivato.",
-    # Reddito e compensi (14)
+    # Reddito e compensi (10)
     "Compensi dei dipendenti a prezzi correnti, inclusi salari e contributi sociali a carico del datore di lavoro. Fonte: conti regionali Eurostat (ESA 2010).",
     "Compensi dei dipendenti a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
     "Compenso nominale per ora lavorata (compensi totali / ore lavorate dai dipendenti). Indicatore derivato.",
@@ -208,10 +193,6 @@ var_labels <- data.table(
     "Costo del lavoro per unit\u00e0 di prodotto (CLUP) nominale basato sulle persone: rapporto tra compenso per dipendente e produttivit\u00e0 per occupato. Indicatore derivato.",
     "Compensi dei dipendenti per settore a prezzi correnti (NACE Rev. 2, 10 settori). Fonte: conti regionali Eurostat.",
     "Compensi dei dipendenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC.",
-    "Reddito disponibile netto delle famiglie. Fonte: conti regionali Eurostat (ESA 2010), conto dei redditi delle famiglie.",
-    "Redditi netti da propriet\u00e0 delle famiglie (interessi, dividendi, affitti). Fonte: conti regionali Eurostat (ESA 2010).",
-    "Risultato netto di gestione e reddito misto delle famiglie. Fonte: conti regionali Eurostat (ESA 2010).",
-    "Imposte correnti su reddito e patrimonio a carico delle famiglie. Fonte: conti regionali Eurostat (ESA 2010).",
     # Formazione del capitale (9)
     "Investimenti fissi lordi (FBCF) a prezzi correnti. Fonte: conti regionali Eurostat (ESA 2010).",
     "Investimenti fissi lordi a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
@@ -221,11 +202,7 @@ var_labels <- data.table(
     "Ammortamenti (consumo di capitale fisso) a prezzi correnti. Fonte: conti regionali Eurostat (ESA 2010).",
     "Ammortamenti a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
     "Ammortamenti per settore a prezzi correnti (NACE Rev. 2, 10 settori). Fonte: conti regionali Eurostat.",
-    "Ammortamenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC.",
-    # Istruzione (3)
-    "Popolazione per livello di istruzione raggiunto (classificazione ISCED 2011). Fonte: Eurostat, EU-LFS.",
-    "Abbandono precoce di istruzione e formazione: percentuale di persone 18-24 anni con al massimo la licenza media e non in formazione. Fonte: Eurostat, EU-LFS.",
-    "Giovani NEET (Neither in Employment nor in Education and Training): percentuale di persone 15-29 anni che non lavorano, non studiano e non seguono corsi di formazione. Fonte: Eurostat, EU-LFS."
+    "Ammortamenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC."
   )
 )
 
@@ -306,18 +283,7 @@ age_labels <- data.table(
   )
 )
 
-# 5. Etichette livelli di istruzione ISCED -----
-
-isced11_labels <- data.table(
-  code = c("ED0-2", "ED3_4", "ED5-8"),
-  label_it = c(
-    "Istruzione primaria e secondaria inferiore",
-    "Istruzione secondaria superiore e post-secondaria",
-    "Istruzione terziaria"
-  )
-)
-
-# 6. Etichette settori NACE -----
+# 5. Etichette settori NACE -----
 
 sector_labels <- data.table(
   code = c(
@@ -352,7 +318,7 @@ sector_labels <- data.table(
   )
 )
 
-# 7. Etichette gruppi tematici -----
+# 6. Etichette gruppi tematici -----
 
 group_labels <- data.table(
   group_id = c(
@@ -361,8 +327,7 @@ group_labels <- data.table(
     "occupazione_settore",
     "pil_valore_aggiunto",
     "reddito_compensi",
-    "formazione_capitale",
-    "istruzione"
+    "formazione_capitale"
   ),
   label_it = c(
     "Popolazione e demografia",
@@ -370,12 +335,11 @@ group_labels <- data.table(
     "Occupazione per settore",
     "PIL e valore aggiunto",
     "Reddito e compensi",
-    "Formazione del capitale",
-    "Istruzione e capitale umano"
+    "Formazione del capitale"
   )
 )
 
-# 8. Funzioni helper per recupero etichette -----
+# 7. Funzioni helper per recupero etichette -----
 
 #' Restituisce l'etichetta italiana di una variabile ARDECO.
 #'
@@ -447,28 +411,13 @@ get_sector_label <- function(code, labels) {
   labels$sector_labels$label_it[idx]
 }
 
-#' Restituisce l'etichetta italiana per il livello di istruzione ISCED.
-#'
-#' @param code character(1) codice ISCED (es. "ED5-8").
-#' @param labels lista caricata da labels.rds.
-#' @return character(1) etichetta italiana, oppure il codice stesso se non trovato.
-get_isced11_label <- function(code, labels) {
-  stopifnot(is.character(code), length(code) == 1L)
-  idx <- match(code, labels$isced11_labels$code)
-  if (is.na(idx)) {
-    return(code)
-  }
-  labels$isced11_labels$label_it[idx]
-}
-
-# 9. Salvataggio -----
+# 8. Salvataggio -----
 
 labels <- list(
   var_labels = var_labels,
   unit_labels = unit_labels,
   sex_labels = sex_labels,
   age_labels = age_labels,
-  isced11_labels = isced11_labels,
   sector_labels = sector_labels,
   group_labels = group_labels
 )
@@ -487,8 +436,5 @@ message(
   " righe, ",
   "sector_labels: ",
   nrow(sector_labels),
-  " righe, ",
-  "isced11_labels: ",
-  nrow(isced11_labels),
   " righe)"
 )

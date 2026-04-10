@@ -80,11 +80,7 @@ thematic_groups <- list(
     "RUWCDHH",
     "RUWCDWE",
     "RUWCZ",
-    "ROWCZ",
-    "RUVNH",
-    "RUYNH",
-    "RUONH",
-    "RUTYH"
+    "ROWCZ"
   ),
   formazione_capitale = c(
     "RUIGT",
@@ -96,11 +92,6 @@ thematic_groups <- list(
     "SOKCT",
     "SUKCZ",
     "SOKCZ"
-  ),
-  istruzione = c(
-    "RPDTN",
-    "RPDEN",
-    "RPDNN"
   )
 )
 
@@ -168,10 +159,6 @@ var_labels <- data.table(
     "RUWCDWE",
     "RUWCZ",
     "ROWCZ",
-    "RUVNH",
-    "RUYNH",
-    "RUONH",
-    "RUTYH",
     "RUIGT",
     "ROIGT",
     "RUIGZ",
@@ -180,10 +167,7 @@ var_labels <- data.table(
     "SUKCT",
     "SOKCT",
     "SUKCZ",
-    "SOKCZ",
-    "RPDTN",
-    "RPDEN",
-    "RPDNN"
+    "SOKCZ"
   ),
   label_it = c(
     "Popolazione media annua",
@@ -236,10 +220,6 @@ var_labels <- data.table(
     "Costo del lavoro per unit\u00e0 di prodotto nominale (persone)",
     "Compensi per settore a prezzi correnti",
     "Compensi per settore a prezzi costanti",
-    "Reddito disponibile netto delle famiglie",
-    "Redditi netti da propriet\u00e0",
-    "Risultato netto di gestione e reddito misto",
-    "Imposte correnti su reddito e patrimonio",
     "Investimenti fissi lordi a prezzi correnti",
     "Investimenti fissi lordi a prezzi costanti",
     "Investimenti fissi lordi per settore a prezzi correnti",
@@ -248,19 +228,15 @@ var_labels <- data.table(
     "Ammortamenti a prezzi correnti",
     "Ammortamenti a prezzi costanti",
     "Ammortamenti per settore a prezzi correnti",
-    "Ammortamenti per settore a prezzi costanti",
-    "Popolazione per livello di istruzione",
-    "Abbandono precoce di istruzione e formazione (18-24 anni)",
-    "Giovani NEET (15-29 anni)"
+    "Ammortamenti per settore a prezzi costanti"
   ),
   group_id = c(
     rep("popolazione_demografia", 12),
     rep("mercato_lavoro", 12),
     rep("occupazione_settore", 2),
     rep("pil_valore_aggiunto", 14),
-    rep("reddito_compensi", 14),
-    rep("formazione_capitale", 9),
-    rep("istruzione", 3)
+    rep("reddito_compensi", 10),
+    rep("formazione_capitale", 9)
   ),
   description_it = c(
     # Popolazione e demografia (12)
@@ -318,10 +294,6 @@ var_labels <- data.table(
     "Costo del lavoro per unit\u00e0 di prodotto (CLUP) nominale basato sulle persone: rapporto tra compenso per dipendente e produttivit\u00e0 per occupato. Indicatore derivato.",
     "Compensi dei dipendenti per settore a prezzi correnti (NACE Rev. 2, 10 settori). Fonte: conti regionali Eurostat.",
     "Compensi dei dipendenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC.",
-    "Reddito disponibile netto delle famiglie. Fonte: conti regionali Eurostat (ESA 2010), conto dei redditi delle famiglie.",
-    "Redditi netti da propriet\u00e0 delle famiglie (interessi, dividendi, affitti). Fonte: conti regionali Eurostat (ESA 2010).",
-    "Risultato netto di gestione e reddito misto delle famiglie. Fonte: conti regionali Eurostat (ESA 2010).",
-    "Imposte correnti su reddito e patrimonio a carico delle famiglie. Fonte: conti regionali Eurostat (ESA 2010).",
     # Formazione del capitale (9)
     "Investimenti fissi lordi (FBCF) a prezzi correnti. Fonte: conti regionali Eurostat (ESA 2010).",
     "Investimenti fissi lordi a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
@@ -331,11 +303,7 @@ var_labels <- data.table(
     "Ammortamenti (consumo di capitale fisso) a prezzi correnti. Fonte: conti regionali Eurostat (ESA 2010).",
     "Ammortamenti a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
     "Ammortamenti per settore a prezzi correnti (NACE Rev. 2, 10 settori). Fonte: conti regionali Eurostat.",
-    "Ammortamenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC.",
-    # Istruzione (3)
-    "Popolazione per livello di istruzione raggiunto (classificazione ISCED 2011). Fonte: Eurostat, EU-LFS.",
-    "Abbandono precoce di istruzione e formazione: percentuale di persone 18-24 anni con al massimo la licenza media e non in formazione. Fonte: Eurostat, EU-LFS.",
-    "Giovani NEET (Neither in Employment nor in Education and Training): percentuale di persone 15-29 anni che non lavorano, non studiano e non seguono corsi di formazione. Fonte: Eurostat, EU-LFS."
+    "Ammortamenti per settore a prezzi costanti (NACE Rev. 2, 10 settori). Fonte: Eurostat, con deflatori JRC."
   )
 )
 
@@ -410,15 +378,6 @@ age_labels <- data.table(
   )
 )
 
-isced11_labels <- data.table(
-  code = c("ED0-2", "ED3_4", "ED5-8"),
-  label_it = c(
-    "Istruzione primaria e secondaria inferiore",
-    "Istruzione secondaria superiore e post-secondaria",
-    "Istruzione terziaria"
-  )
-)
-
 sector_labels <- data.table(
   code = c(
     "A",
@@ -459,8 +418,7 @@ group_labels <- data.table(
     "occupazione_settore",
     "pil_valore_aggiunto",
     "reddito_compensi",
-    "formazione_capitale",
-    "istruzione"
+    "formazione_capitale"
   ),
   label_it = c(
     "Popolazione e demografia",
@@ -468,8 +426,7 @@ group_labels <- data.table(
     "Occupazione per settore",
     "PIL e valore aggiunto",
     "Reddito e compensi",
-    "Formazione del capitale",
-    "Istruzione e capitale umano"
+    "Formazione del capitale"
   )
 )
 
@@ -652,7 +609,6 @@ dbWriteTable(con, "var_labels", var_labels, overwrite = TRUE)
 dbWriteTable(con, "unit_labels", unit_labels, overwrite = TRUE)
 dbWriteTable(con, "sex_labels", sex_labels, overwrite = TRUE)
 dbWriteTable(con, "age_labels", age_labels, overwrite = TRUE)
-dbWriteTable(con, "isced11_labels", isced11_labels, overwrite = TRUE)
 dbWriteTable(con, "sector_labels", sector_labels, overwrite = TRUE)
 dbWriteTable(con, "group_labels", group_labels, overwrite = TRUE)
 dbWriteTable(con, "download_log", summary_log, overwrite = TRUE)

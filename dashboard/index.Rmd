@@ -89,8 +89,7 @@ PAGE_CONFIG <- list(
   reddito_compensi = list(
     page_id = "inc",
     vars    = c("RUWCD", "ROWCD", "RUWCDH", "ROWCDH", "RUWCDW", "ROWCDW",
-                "RUWCDHH", "RUWCDWE", "RUWCZ", "ROWCZ",
-                "RUVNH", "RUYNH", "RUONH", "RUTYH"),
+                "RUWCDHH", "RUWCDWE", "RUWCZ", "ROWCZ"),
     vb1_var = "RUWCD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-wallet", vb1_color = "primary",
     vb2_var = "ROWCD", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-wallet", vb2_color = "info",
     vb1_filter = list(unit = "MIO_EUR"),
@@ -112,18 +111,6 @@ PAGE_CONFIG <- list(
     vb2_title  = "FBCF costante (Lombardia)",
     vb1_format = function(v) format(round(v), big.mark = "."),
     vb2_format = function(v) format(round(v), big.mark = ".")
-  ),
-  istruzione = list(
-    page_id = "edu",
-    vars    = c("RPDTN", "RPDEN", "RPDNN"),
-    vb1_var = "RPDEN", vb1_unit = "PC",  vb1_icon = "fa-graduation-cap", vb1_color = "primary",
-    vb2_var = "RPDNN", vb2_unit = "PC",  vb2_icon = "fa-user-clock",     vb2_color = "danger",
-    vb1_filter = list(unit = "PC"),
-    vb2_filter = list(unit = "PC"),
-    vb1_title  = "Abbandono scolastico precoce (Lombardia)",
-    vb2_title  = "Giovani NEET (Lombardia)",
-    vb1_format = function(v) paste0(round(v, 1), "%"),
-    vb2_format = function(v) paste0(round(v, 1), "%")
   )
 )
 
@@ -639,54 +626,6 @@ plotly::plotlyOutput("cap_ts")
 
 ```{r}
 leaflet::leafletOutput("cap_map")
-```
-
-# Istruzione e capitale umano
-
-## {.sidebar}
-
-```{r}
-selectInput("edu_var", "Variabile",
-  choices = setNames(
-    PAGE_CONFIG$istruzione$vars,
-    vapply(PAGE_CONFIG$istruzione$vars,
-           get_var_label, character(1L), labels = LABELS)
-  )
-)
-uiOutput("edu_unit_ui")
-uiOutput("edu_sex_ui")
-uiOutput("edu_age_ui")
-uiOutput("edu_sector_ui")
-uiOutput("edu_isced11_ui")
-uiOutput("edu_desc_ui")
-```
-
-## Row {data-height=120}
-
-### Abbandono scolastico precoce
-
-```{r}
-valueBoxOutput("edu_vb1")
-```
-
-### Giovani NEET
-
-```{r}
-valueBoxOutput("edu_vb2")
-```
-
-## Row {data-height=880}
-
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("edu_ts")
-```
-
-### Mappa {data-width=400}
-
-```{r}
-leaflet::leafletOutput("edu_map")
 ```
 
 

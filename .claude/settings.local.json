@@ -30,7 +30,16 @@
       "Bash(lsof -ti:5454 -ti:6399)",
       "Bash(grep -E \"^d|\\\\.R$|\\\\.rds$|\\\\.parquet$\")",
       "Bash(R:*)",
-      "Bash(grep -E \"^[A-Z].*[.]parquet$\")"
+      "Bash(grep -E \"^[A-Z].*[.]parquet$\")",
+      "Bash(xargs cat:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:knowledge4policy.ec.europa.eu)",
+      "WebFetch(domain:cran.r-project.org)",
+      "WebFetch(domain:publications.jrc.ec.europa.eu)",
+      "WebFetch(domain:urban.jrc.ec.europa.eu)",
+      "WebFetch(domain:www.researchgate.net)",
+      "WebFetch(domain:rdrr.io)",
+      "WebFetch(domain:ec.europa.eu)"
     ]
   }
 }

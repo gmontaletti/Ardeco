@@ -371,16 +371,16 @@ valueBoxOutput("pop_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("pop_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("pop_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("pop_ts")
 ```
 
 
@@ -420,16 +420,16 @@ valueBoxOutput("lab_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("lab_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("lab_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("lab_ts")
 ```
 
 
@@ -469,16 +469,16 @@ valueBoxOutput("sec_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("sec_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("sec_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("sec_ts")
 ```
 
 
@@ -518,16 +518,16 @@ valueBoxOutput("gdp_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("gdp_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("gdp_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("gdp_ts")
 ```
 
 
@@ -567,16 +567,16 @@ valueBoxOutput("inc_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("inc_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("inc_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("inc_ts")
 ```
 
 
@@ -616,16 +616,16 @@ valueBoxOutput("cap_vb2")
 
 ## Row {data-height=880}
 
-### Serie storica {data-width=600}
-
-```{r}
-plotly::plotlyOutput("cap_ts")
-```
-
-### Mappa {data-width=400}
+### Mappa {data-width=500}
 
 ```{r}
 leaflet::leafletOutput("cap_map")
+```
+
+### Serie storica {data-width=500}
+
+```{r}
+plotly::plotlyOutput("cap_ts")
 ```
 
 

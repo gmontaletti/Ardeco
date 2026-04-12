@@ -4,20 +4,19 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 
 ## 1. Struttura del database
 
-10 tabelle:
+9 tabelle:
 
 | Tabella | Righe | Descrizione |
 |---|---|---|
-| `ardeco_data` | 259.555 | Dati principali (66 variabili) |
+| `ardeco_data` | 259.259 | Dati principali (59 variabili) |
 | `variable_list` | 83 | Catalogo variabili ARDECO API |
-| `var_labels` | 66 | Etichette e descrizioni variabili |
-| `download_log` | 66 | Log di download (stato, tempi) |
+| `var_labels` | 59 | Etichette e descrizioni variabili |
+| `download_log` | 59 | Log di download (stato, tempi) |
 | `unit_labels` | 16 | Etichette unità di misura |
 | `sector_labels` | 13 | Etichette settori NACE |
 | `age_labels` | 10 | Etichette classi di età |
-| `group_labels` | 7 | Etichette gruppi tematici |
+| `group_labels` | 6 | Etichette gruppi tematici |
 | `sex_labels` | 3 | Etichette sesso |
-| `isced11_labels` | 3 | Etichette livelli di istruzione |
 
 ### Schema `ardeco_data`
 
@@ -33,22 +32,21 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 | SEX | VARCHAR | sì | Sesso (F, M, TOTAL) |
 | AGE | VARCHAR | sì | Classe di età |
 | SECTOR | VARCHAR | sì | Settore NACE |
-| ISCED11 | VARCHAR | sì | Livello di istruzione |
+| ISCED11 | VARCHAR | sì | Livello di istruzione (non utilizzato) |
 | THEMATIC_GROUP | VARCHAR | NOT NULL | Gruppo tematico |
 
 ## 2. Inventario delle dimensioni
 
-### Gruppi tematici (7)
+### Gruppi tematici (6)
 
 | group_id | Etichetta | Variabili | Righe | % totale |
 |---|---|---|---|---|
-| popolazione_demografia | Popolazione e demografia | 12 | 140.192 | 54,0% |
+| popolazione_demografia | Popolazione e demografia | 12 | 140.192 | 54,1% |
 | formazione_capitale | Formazione del capitale | 9 | 40.534 | 15,6% |
 | pil_valore_aggiunto | PIL e valore aggiunto | 14 | 35.386 | 13,6% |
-| reddito_compensi | Reddito e compensi | 14 | 27.224 | 10,5% |
+| reddito_compensi | Reddito e compensi | 10 | 27.053 | 10,4% |
 | occupazione_settore | Occupazione per settore | 2 | 10.140 | 3,9% |
 | mercato_lavoro | Mercato del lavoro | 12 | 5.954 | 2,3% |
-| istruzione | Istruzione e capitale umano | 3 | 125 | <0,1% |
 
 ### Unità di misura (15)
 
@@ -74,11 +72,11 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 
 TOTAL, F, M
 
-### Classi di età (34 valori distinti nei dati)
+### Classi di età (32 valori distinti nei dati)
 
 Classi con etichetta definita (10): TOTAL, Y15-39, Y15-64, Y20-64, Y40-64, Y_GE15, Y_GE65, Y_LT15, Y_LT20, Y_LT15-GE65.
 
-Classi aggiuntive presenti nei dati (24): Y10-14, Y15-19, Y15-29, Y20-24, Y20-29, Y25-29, Y25-64, Y30-34, Y35-39, Y40-44, Y45-49, Y5-9, Y50-54, Y55-59, Y60-64, Y65-69, Y70-74, Y75-79, Y80-84, Y85-89, Y_GE85, Y_GE90, Y_LT20-GE65, Y_LT5.
+Classi aggiuntive presenti nei dati (22): Y10-14, Y15-19, Y15-29, Y20-24, Y20-29, Y25-29, Y25-64, Y30-34, Y35-39, Y40-44, Y45-49, Y5-9, Y50-54, Y55-59, Y60-64, Y65-69, Y70-74, Y75-79, Y80-84, Y85-89, Y_GE85, Y_GE90.
 
 ### Settori NACE (13)
 
@@ -98,20 +96,14 @@ Classi aggiuntive presenti nei dati (24): Y10-14, Y15-19, Y15-29, Y20-24, Y20-29
 | O-U | PA, istruzione, sanità e altri servizi |
 | R-U | Altre attività di servizi |
 
-### Livelli di istruzione ISCED (3)
-
-| Codice | Etichetta |
-|---|---|
-| ED0-2 | Istruzione primaria e secondaria inferiore |
-| ED3_4 | Istruzione secondaria superiore e post-secondaria |
-| ED5-8 | Istruzione terziaria |
-
 ## 3. Distribuzione per livello NUTS
 
 | Livello | Codici | Righe | % totale |
 |---|---|---|---|
-| NUTS 2 (regione) | ITC4 | 20.265 | 7,8% |
-| NUTS 3 (province) | ITC41–ITC4D (12) | 239.290 | 92,2% |
+| NUTS 2 (regione) | ITC4 | 19.969 | 7,7% |
+| NUTS 3 (province) | ITC41–ITC4D (12) | 239.290 | 92,3% |
+
+Tutte le 59 variabili sono disponibili a entrambi i livelli NUTS.
 
 Righe per codice NUTS3:
 
@@ -130,7 +122,7 @@ Righe per codice NUTS3:
 | ITC4C | 19.941 |
 | ITC4D | 19.939 |
 
-La distribuzione è uniforme tra le province (~19.941 righe ciascuna), con ITC4D che presenta 2 righe in meno.
+La distribuzione è uniforme tra le province (~19.941 righe ciascuna).
 
 ## 4. Copertura temporale per variabile
 
@@ -186,10 +178,6 @@ La distribuzione è uniforme tra le province (~19.941 righe ciascuna), con ITC4D
 | RUWCDWE | reddito_compensi | 1995 | 2027 | 429 | 13 |
 | RUWCZ | reddito_compensi | 1995 | 2024 | 10.140 | 13 |
 | ROWCZ | reddito_compensi | 1995 | 2024 | 10.140 | 13 |
-| RUVNH | reddito_compensi | 1995 | 2024 | 60 | 1 |
-| RUYNH | reddito_compensi | 1980 | 2027 | 48 | 1 |
-| RUONH | reddito_compensi | 1995 | 2024 | 30 | 1 |
-| RUTYH | reddito_compensi | 1995 | 2027 | 33 | 1 |
 | RUIGT | formazione_capitale | 1980 | 2027 | 1.053 | 13 |
 | ROIGT | formazione_capitale | 1980 | 2027 | 1.235 | 13 |
 | RUIGZ | formazione_capitale | 1995 | 2024 | 10.140 | 13 |
@@ -199,13 +187,8 @@ La distribuzione è uniforme tra le province (~19.941 righe ciascuna), con ITC4D
 | SOKCT | formazione_capitale | 1980 | 2027 | 1.235 | 13 |
 | SUKCZ | formazione_capitale | 1995 | 2024 | 5.070 | 13 |
 | SOKCZ | formazione_capitale | 1995 | 2024 | 9.971 | 13 |
-| RPDTN | istruzione | 2000 | 2024 | 75 | 1 |
-| RPDEN | istruzione | 2000 | 2024 | 25 | 1 |
-| RPDNN | istruzione | 2000 | 2024 | 25 | 1 |
 
-Intervallo complessivo: 1960–2027 (68 anni). Le serie demografiche risalgono al 1960, quelle economiche in prevalenza al 1980. Le variabili di istruzione partono dal 2000 e coprono solo il livello NUTS 2.
-
-Le variabili RUVNH, RUYNH, RUONH, RUTYH (reddito famiglie) e RPDTN, RPDEN, RPDNN (istruzione) sono disponibili solo al livello regionale (1 codice NUTS).
+Intervallo complessivo: 1960–2027 (68 anni). Le serie demografiche risalgono al 1960, quelle economiche in prevalenza al 1980.
 
 ## 5. Serie temporali uniche per livello NUTS
 
@@ -213,41 +196,39 @@ Una serie temporale è definita come una combinazione unica di (VARIABLE, NUTSCO
 
 | Livello | Serie temporali |
 |---|---|
-| NUTS 2 (regione) | 518 |
+| NUTS 2 (regione) | 511 |
 | NUTS 3 (province) | 6.084 |
-| **Totale** | **6.602** |
+| **Totale** | **6.595** |
 
-Rapporto NUTS3/NUTS2: 11,7 (vicino a 12, il numero delle province). Le serie con un solo codice NUTS (RUVNH, RUYNH, RUONH, RUTYH, RPDTN, RPDEN, RPDNN) sono presenti solo al livello regionale.
+Rapporto NUTS3/NUTS2: 11,9 (vicino a 12, il numero delle province).
 
 ## 6. Completezza dei dati e analisi dei NULL
 
 ### Completezza VALUE
 
-Tutte le 259.555 righe hanno VALUE non nullo (100%).
+Tutte le 259.259 righe hanno VALUE non nullo (100%).
 
 ### Dimensioni opzionali: copertura
 
 | Dimensione | Righe con valore | Righe NULL | % con valore |
 |---|---|---|---|
-| UNIT | 259.555 | 0 | 100% |
-| SEX | 138.837 | 120.718 | 53,5% |
-| AGE | 138.461 | 121.094 | 53,3% |
-| SECTOR | 85.852 | 173.703 | 33,1% |
-| ISCED11 | 75 | 259.480 | 0,03% |
+| UNIT | 259.259 | 0 | 100% |
+| SEX | 138.712 | 120.547 | 53,5% |
+| AGE | 138.412 | 120.847 | 53,4% |
+| SECTOR | 85.852 | 173.407 | 33,1% |
 
 ### NULL per gruppo tematico
 
-| Gruppo | NULL SEX | NULL AGE | NULL SECTOR | NULL ISCED11 |
-|---|---|---|---|---|
-| popolazione_demografia | 2.288 | 2.249 | 140.192 | 140.192 |
-| mercato_lavoro | 5.146 | 5.536 | 5.954 | 5.954 |
-| occupazione_settore | 10.140 | 10.140 | 0 | 10.140 |
-| pil_valore_aggiunto | 35.386 | 35.386 | 15.106 | 35.386 |
-| reddito_compensi | 27.224 | 27.224 | 6.944 | 27.224 |
-| formazione_capitale | 40.534 | 40.534 | 5.382 | 40.534 |
-| istruzione | 0 | 25 | 125 | 50 |
+| Gruppo | NULL SEX | NULL AGE | NULL SECTOR |
+|---|---|---|---|
+| popolazione_demografia | 2.288 | 2.249 | 140.192 |
+| mercato_lavoro | 5.146 | 5.536 | 5.954 |
+| occupazione_settore | 10.140 | 10.140 | 0 |
+| pil_valore_aggiunto | 35.386 | 35.386 | 15.106 |
+| reddito_compensi | 27.053 | 27.053 | 6.773 |
+| formazione_capitale | 40.534 | 40.534 | 5.382 |
 
-Le dimensioni SEX e AGE sono popolate prevalentemente nelle variabili demografiche e del mercato del lavoro. SECTOR è presente nelle variabili disaggregate per settore (occupazione_settore al 100%, più le variabili "Z" degli altri gruppi). ISCED11 è presente solo nelle 3 variabili di istruzione (75 righe).
+Le dimensioni SEX e AGE sono popolate prevalentemente nelle variabili demografiche e del mercato del lavoro. SECTOR è presente nelle variabili disaggregate per settore (occupazione_settore al 100%, più le variabili con suffisso "Z" degli altri gruppi).
 
 ## 7. Statistiche descrittive di VALUE per gruppo tematico
 
@@ -257,11 +238,10 @@ Le dimensioni SEX e AGE sono popolate prevalentemente nelle variabili demografic
 | mercato_lavoro | 0,1 | 349 | 183.376 | 8.995.607 | 864.383 |
 | occupazione_settore | 0,3 | 1.169 | 78.470 | 2.594.733 | 263.620 |
 | pil_valore_aggiunto | -10,9 | 2.235 | 16.503 | 578.869 | 40.090 |
-| reddito_compensi | 0,3 | 790 | 7.165 | 275.179 | 18.496 |
+| reddito_compensi | 0,3 | 790 | 6.645 | 232.850 | 18.116 |
 | formazione_capitale | 3,5 | 386 | 6.973 | 1.207.384 | 56.241 |
-| istruzione | 7,7 | 21,2 | 26,0 | 54,2 | 13,6 |
 
-I valori negativi in popolazione_demografia corrispondono a saldi migratori e variazioni di popolazione. Le variabili di istruzione sono percentuali (range 7,7–54,2). La dispersione elevata nel mercato del lavoro riflette la compresenza di unità di misura diverse (numeri assoluti, percentuali, ore).
+I valori negativi in popolazione_demografia corrispondono a saldi migratori e variazioni di popolazione. La dispersione elevata nel mercato del lavoro riflette la compresenza di unità di misura diverse (numeri assoluti, percentuali, ore).
 
 ## 8. Top 10 variabili per numero di righe
 
@@ -276,17 +256,17 @@ I valori negativi in popolazione_demografia corrispondono a saldi migratori e va
 | 7 | RUWCZ | reddito_compensi | 10.140 |
 | 8 | ROWCZ | reddito_compensi | 10.140 |
 | 9 | RUIGZ | formazione_capitale | 10.140 |
-| 10 | RNLHZ | occupazione_settore | 5.070 |
+| 10 | ROIGZ | formazione_capitale | 9.971 |
 
 Le variabili con suffisso "Z" (disaggregazione settoriale) e le demografiche per classi di età generano il maggior volume di dati per la moltiplicazione delle dimensioni.
 
 ## 9. Osservazioni
 
-- 24 classi di età presenti nei dati (classi quinquennali Eurostat) non hanno una corrispondenza nella tabella `age_labels`, che contiene solo 10 aggregazioni. Valutare l'integrazione delle etichette mancanti.
-- Le unità I15, I20 e PCH_PRE presenti nei dati non compaiono nella tabella `unit_labels` (15 codici con etichetta su 15+ nei dati).
-- Le variabili di istruzione e reddito familiare sono disponibili solo a livello NUTS 2, limitando l'analisi provinciale per questi temi.
-- La dimensione file (2,4 MB) è contenuta grazie alla compressione colonnare di DuckDB e all'assenza di SNPTY (popolazione per singolo anno di età).
+- 22 classi di età presenti nei dati (classi quinquennali Eurostat) non hanno una corrispondenza nella tabella `age_labels`, che contiene solo 10 aggregazioni. Valutare l'integrazione delle etichette mancanti.
+- Le unità I15, I20 e PCH_PRE presenti nei dati non compaiono nella tabella `unit_labels`.
+- La dimensione file (~2,4 MB) è contenuta grazie alla compressione colonnare di DuckDB.
+- La colonna ISCED11 è presente nello schema ma non contiene valori per le 59 variabili attive.
 
 ---
 
-*Generato il 2026-04-10 da `data/ardeco.duckdb` (259.555 righe, 66 variabili, 6.602 serie temporali).*
+*Generato il 2026-04-10 da `data/ardeco.duckdb` (259.259 righe, 59 variabili, 6.595 serie temporali, 6 gruppi tematici).*

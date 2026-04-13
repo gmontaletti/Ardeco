@@ -19,6 +19,9 @@ source("R/helpers.R")
 LABELS <- load_labels()
 GEO    <- load_geo()
 
+# Close DuckDB connection when Shiny session ends
+onSessionEnded(close_db_con)
+
 # 2. Parquet cache -----
 
 .var_cache <- new.env(parent = emptyenv())
@@ -49,7 +52,7 @@ PAGE_CONFIG <- list(
   mercato_lavoro = list(
     page_id = "lab",
     vars    = c("RPECNP", "RPUCNP", "SNETD", "SNETDP", "SNWTD", "RNECN", "RNUTN",
-                "RNLCN", "RNLHT", "RNLHTP", "RNLHTE", "RNLHW"),
+                "RNLCN", "RNLHT", "RNLHTP", "RNLHW"),
     vb1_var = "RPECNP", vb1_unit = "PC",  vb1_icon = "fa-briefcase",  vb1_color = "primary",
     vb2_var = "RPUCNP", vb2_unit = "PC",  vb2_icon = "fa-user-times", vb2_color = "info",
     vb1_filter = list(unit = "PC"),
@@ -88,7 +91,7 @@ PAGE_CONFIG <- list(
   ),
   reddito_compensi = list(
     page_id = "inc",
-    vars    = c("RUWCD", "ROWCD", "RUWCDH", "ROWCDH", "RUWCDW", "ROWCDW",
+    vars    = c("RUWCD", "ROWCD", "ROWCDH", "RUWCDW", "ROWCDW",
                 "RUWCDHH", "RUWCDWE", "RUWCZ", "ROWCZ"),
     vb1_var = "RUWCD", vb1_unit = "MIO_EUR",     vb1_icon = "fa-wallet", vb1_color = "primary",
     vb2_var = "ROWCD", vb2_unit = "MIO_EUR2015",  vb2_icon = "fa-wallet", vb2_color = "info",

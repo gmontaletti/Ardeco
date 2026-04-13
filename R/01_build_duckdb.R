@@ -45,7 +45,6 @@ thematic_groups <- list(
     "RNLCN",
     "RNLHT",
     "RNLHTP",
-    "RNLHTE",
     "RNLHW",
     "RPECNP",
     "RPUCNP"
@@ -73,7 +72,6 @@ thematic_groups <- list(
   reddito_compensi = c(
     "RUWCD",
     "ROWCD",
-    "RUWCDH",
     "ROWCDH",
     "RUWCDW",
     "ROWCDW",
@@ -129,7 +127,6 @@ var_labels <- data.table(
     "RNLCN",
     "RNLHT",
     "RNLHTP",
-    "RNLHTE",
     "RNLHW",
     "RPECNP",
     "RPUCNP",
@@ -151,7 +148,6 @@ var_labels <- data.table(
     "SPVGE",
     "RUWCD",
     "ROWCD",
-    "RUWCDH",
     "ROWCDH",
     "RUWCDW",
     "ROWCDW",
@@ -190,7 +186,6 @@ var_labels <- data.table(
     "Forza lavoro (15 anni e oltre)",
     "Ore lavorate (occupati)",
     "Ore lavorate pro capite",
-    "Ore lavorate per occupato",
     "Ore lavorate (dipendenti)",
     "Tasso di occupazione (20-64 anni)",
     "Tasso di disoccupazione (15-74 anni)",
@@ -212,7 +207,6 @@ var_labels <- data.table(
     "Tasso di crescita del VA (indice concatenato)",
     "Compensi dei dipendenti a prezzi correnti",
     "Compensi dei dipendenti a prezzi costanti",
-    "Compenso nominale per ora lavorata",
     "Compenso reale per ora lavorata",
     "Compenso nominale per dipendente",
     "Compenso reale per dipendente",
@@ -232,10 +226,10 @@ var_labels <- data.table(
   ),
   group_id = c(
     rep("popolazione_demografia", 12),
-    rep("mercato_lavoro", 12),
+    rep("mercato_lavoro", 11),
     rep("occupazione_settore", 2),
     rep("pil_valore_aggiunto", 14),
-    rep("reddito_compensi", 10),
+    rep("reddito_compensi", 9),
     rep("formazione_capitale", 9)
   ),
   description_it = c(
@@ -252,7 +246,7 @@ var_labels <- data.table(
     "Variazione della popolazione per 1000 abitanti. Indicatore derivato.",
     "Migrazione netta per 1000 abitanti, per grandi fasce d\u2019et\u00e0. Indicatore derivato.",
     "Indice di dipendenza: rapporto tra popolazione in et\u00e0 non lavorativa (0-19 e 65+) e popolazione in et\u00e0 lavorativa (20-64). Indicatore derivato.",
-    # Mercato del lavoro (12)
+    # Mercato del lavoro (11)
     "Occupazione totale workplace-based (persone occupate nel territorio), secondo la definizione dei conti nazionali. Fonte: conti regionali Eurostat (ESA 2010).",
     "Occupazione pro capite, calcolata come rapporto tra occupati workplace-based e popolazione media annua. Indicatore derivato.",
     "Dipendenti workplace-based (lavoratori subordinati nel territorio). Fonte: conti regionali Eurostat (ESA 2010).",
@@ -261,7 +255,6 @@ var_labels <- data.table(
     "Forza lavoro (occupati pi\u00f9 disoccupati), popolazione di 15 anni e oltre. Fonte: Eurostat, EU-LFS.",
     "Ore lavorate totali (tutte le persone occupate). Fonte: conti regionali Eurostat (ESA 2010), con integrazioni JRC.",
     "Ore lavorate pro capite, calcolate come rapporto tra ore totali e popolazione media annua. Indicatore derivato.",
-    "Ore lavorate per occupato, calcolate come rapporto tra ore totali e occupazione workplace-based. Indicatore derivato.",
     "Ore lavorate dei soli dipendenti. Fonte: conti regionali Eurostat (ESA 2010), con integrazioni JRC.",
     "Tasso di occupazione: percentuale di occupati sulla popolazione in et\u00e0 20-64 anni. Fonte: Eurostat, EU-LFS.",
     "Tasso di disoccupazione: percentuale di disoccupati sulla forza lavoro in et\u00e0 15-74 anni. Dato sperimentale. Fonte: Eurostat, EU-LFS.",
@@ -283,10 +276,9 @@ var_labels <- data.table(
     "PIL pro capite a prezzi costanti (PIL reale / popolazione media annua). Indicatore derivato.",
     "Tasso di crescita del PIL, calcolato come indice concatenato in volume. Indicatore derivato.",
     "Tasso di crescita del valore aggiunto, calcolato come indice concatenato in volume. Indicatore derivato.",
-    # Reddito e compensi (14)
+    # Reddito e compensi (9)
     "Compensi dei dipendenti a prezzi correnti, inclusi salari e contributi sociali a carico del datore di lavoro. Fonte: conti regionali Eurostat (ESA 2010).",
     "Compensi dei dipendenti a prezzi costanti (anno base 2015). Fonte: Eurostat, con deflatori JRC.",
-    "Compenso nominale per ora lavorata (compensi totali / ore lavorate dai dipendenti). Indicatore derivato.",
     "Compenso reale per ora lavorata (compensi a prezzi costanti / ore dipendenti). Indicatore derivato.",
     "Compenso nominale per dipendente (compensi totali / numero di dipendenti). Indicatore derivato.",
     "Compenso reale per dipendente (compensi a prezzi costanti / numero di dipendenti). Indicatore derivato.",
@@ -324,7 +316,10 @@ unit_labels <- data.table(
     "EUR",
     "PPS_EU27_2020",
     "EUR2015",
-    "EUR2020"
+    "EUR2020",
+    "I15",
+    "I20",
+    "PCH_PRE"
   ),
   label_it = c(
     "Numero",
@@ -342,7 +337,10 @@ unit_labels <- data.table(
     "Euro",
     "PPS (EU27 2020)",
     "Euro (prezzi 2015)",
-    "Euro (prezzi 2020)"
+    "Euro (prezzi 2020)",
+    "Indice concatenato (base 2015)",
+    "Indice concatenato (base 2020)",
+    "Variazione percentuale sull'anno precedente"
   )
 )
 
@@ -354,27 +352,71 @@ sex_labels <- data.table(
 age_labels <- data.table(
   code = c(
     "TOTAL",
+    "Y_LT5",
+    "Y5-9",
+    "Y10-14",
+    "Y15-19",
     "Y15-39",
     "Y15-64",
+    "Y20-24",
+    "Y20-29",
     "Y20-64",
+    "Y25-29",
+    "Y30-34",
+    "Y35-39",
+    "Y40-44",
     "Y40-64",
+    "Y45-49",
+    "Y50-54",
+    "Y55-59",
+    "Y60-64",
+    "Y65-69",
+    "Y70-74",
+    "Y75-79",
+    "Y80-84",
+    "Y85-89",
     "Y_GE15",
     "Y_GE65",
+    "Y_GE85",
+    "Y_GE90",
     "Y_LT15",
     "Y_LT20",
-    "Y_LT15-GE65"
+    "Y_LT15-GE65",
+    "Y_LT20-GE65"
   ),
   label_it = c(
     "Totale",
+    "Meno di 5 anni",
+    "5-9 anni",
+    "10-14 anni",
+    "15-19 anni",
     "15-39 anni",
     "15-64 anni",
+    "20-24 anni",
+    "20-29 anni",
     "20-64 anni",
+    "25-29 anni",
+    "30-34 anni",
+    "35-39 anni",
+    "40-44 anni",
     "40-64 anni",
+    "45-49 anni",
+    "50-54 anni",
+    "55-59 anni",
+    "60-64 anni",
+    "65-69 anni",
+    "70-74 anni",
+    "75-79 anni",
+    "80-84 anni",
+    "85-89 anni",
     "15 anni e oltre",
     "65 anni e oltre",
+    "85 anni e oltre",
+    "90 anni e oltre",
     "Meno di 15 anni",
     "Meno di 20 anni",
-    "Meno di 15 e 65 anni e oltre"
+    "Meno di 15 e 65 anni e oltre",
+    "Meno di 20 e 65 anni e oltre"
   )
 )
 
@@ -598,6 +640,13 @@ for (i in seq_along(all_vars)) {
     set(summary_log, i, "elapsed_sec", elapsed)
   }
 }
+
+# Rimozione combinazioni invarianti tra province
+n_del <- dbExecute(
+  con,
+  "DELETE FROM ardeco_data WHERE VARIABLE = 'ROWCDH' AND UNIT = 'EUR2020'"
+)
+message(sprintf("Rimossi %d record invarianti (ROWCDH EUR2020)", n_del))
 
 # Creazione indici
 dbExecute(con, "CREATE INDEX idx_variable ON ardeco_data (VARIABLE)")

@@ -1,5 +1,5 @@
 # helpers.R
-# Shared helper functions for the ARDECO Lombardia Quarto dashboard.
+# Shared helper functions for the ARDECO Lombardia dashboard.
 # Each function handles one concern: data loading, filtering, uniqueness
 # checking, time-series visualisation, choropleth mapping, or tabular display.
 #
@@ -9,7 +9,8 @@
 # 1. Libraries -----
 
 library(data.table)
-library(arrow)
+library(duckdb)
+library(DBI)
 library(sf)
 library(ggplot2)
 library(plotly)
@@ -18,12 +19,46 @@ library(DT)
 library(scales)
 library(RColorBrewer)
 
-# 2. Data loading -----
+# 2. DuckDB connection -----
 
-#' Read a single-variable Parquet file from the data directory.
+.db_env <- new.env(parent = emptyenv())
+
+#' Open or retrieve the shared DuckDB connection (read-only).
+#'
+#' @return A DBI connection object.
+get_db_con <- function() {
+  if (is.null(.db_env$con) || !DBI::dbIsValid(.db_env$con)) {
+    db_path <- file.path("..", "data", "ardeco.duckdb")
+    if (!file.exists(db_path)) {
+      stop(
+        "DuckDB database not found: ",
+        db_path,
+        "\nRun R/01_build_duckdb.R first.",
+        call. = FALSE
+      )
+    }
+    .db_env$con <- DBI::dbConnect(
+      duckdb::duckdb(),
+      dbdir = db_path,
+      read_only = TRUE
+    )
+  }
+  .db_env$con
+}
+
+#' Close the shared DuckDB connection.
+close_db_con <- function() {
+  if (!is.null(.db_env$con) && DBI::dbIsValid(.db_env$con)) {
+    DBI::dbDisconnect(.db_env$con, shutdown = TRUE)
+    .db_env$con <- NULL
+  }
+}
+
+# 3. Data loading -----
+
+#' Load a single ARDECO variable from DuckDB.
 #'
 #' @param var_code Character. ARDECO variable code (e.g. "SNPTD").
-#'   The file must exist at `../data/{var_code}.parquet`.
 #' @return A data.table.
 load_variable <- function(var_code) {
   stopifnot(
@@ -31,36 +66,54 @@ load_variable <- function(var_code) {
     length(var_code) == 1L,
     nchar(var_code) > 0L
   )
-  path <- file.path("..", "data", paste0(var_code, ".parquet"))
-  if (!file.exists(path)) {
+  con <- get_db_con()
+  result <- DBI::dbGetQuery(
+    con,
+    "SELECT * FROM ardeco_data WHERE VARIABLE = ?",
+    params = list(var_code)
+  )
+  if (nrow(result) == 0L) {
     stop(
-      "Parquet file not found: ",
-      path,
-      "\nVariable code '",
+      "No data found for variable '",
       var_code,
-      "' may be invalid or the data ",
-      "pipeline has not been run.",
+      "'. The variable code may be invalid or the database ",
+      "has not been built.",
       call. = FALSE
     )
   }
-  as.data.table(arrow::read_parquet(path))
+  dt <- data.table::as.data.table(result)
+  # Drop all-NA dimension columns to match previous parquet behavior
+  for (col in c("SEX", "AGE", "SECTOR", "ISCED11")) {
+    if (col %in% names(dt) && all(is.na(dt[[col]]))) {
+      set(dt, j = col, value = NULL)
+    }
+  }
+  dt
 }
 
-#' Read the labels lookup list.
+#' Read the labels lookup list from DuckDB.
 #'
-#' @return A named list containing label mappings (e.g. variable_labels,
-#'   unit_labels, sector_labels).
+#' @return A named list containing label data.tables (var_labels,
+#'   unit_labels, sex_labels, age_labels, sector_labels, group_labels).
 load_labels <- function() {
-  path <- file.path("..", "data", "labels.rds")
-  if (!file.exists(path)) {
-    stop(
-      "Labels file not found: ",
-      path,
-      "\nRun the data pipeline to generate labels.rds.",
-      call. = FALSE
-    )
-  }
-  readRDS(path)
+  con <- get_db_con()
+  list(
+    var_labels = data.table::as.data.table(DBI::dbReadTable(con, "var_labels")),
+    unit_labels = data.table::as.data.table(DBI::dbReadTable(
+      con,
+      "unit_labels"
+    )),
+    sex_labels = data.table::as.data.table(DBI::dbReadTable(con, "sex_labels")),
+    age_labels = data.table::as.data.table(DBI::dbReadTable(con, "age_labels")),
+    sector_labels = data.table::as.data.table(DBI::dbReadTable(
+      con,
+      "sector_labels"
+    )),
+    group_labels = data.table::as.data.table(DBI::dbReadTable(
+      con,
+      "group_labels"
+    ))
+  )
 }
 
 #' Read the Lombardia NUTS-3 GeoPackage.
@@ -79,7 +132,7 @@ load_geo <- function() {
   sf::st_read(path, quiet = TRUE)
 }
 
-# 3. Filtering and validation -----
+# 4. Filtering and validation -----
 
 #' Apply dimension filters to a data.table.
 #'
@@ -152,7 +205,7 @@ ensure_unique <- function(dt, by_cols = c("NUTSCODE", "YEAR")) {
   invisible(dt)
 }
 
-# 4. Regional time-series plotly chart -----
+# 5. Regional time-series plotly chart -----
 
 #' Create an interactive time-series chart with regional total and provinces.
 #'
@@ -294,7 +347,7 @@ ts_plotly_regional <- function(
   fig
 }
 
-# 5. Leaflet choropleth map -----
+# 6. Leaflet choropleth map -----
 
 #' Create a leaflet choropleth map for a single year.
 #'
@@ -472,7 +525,7 @@ map_leaflet <- function(dt, geo, var_label, unit_label, year = NULL) {
     htmlwidgets::onRender(js_invalidate)
 }
 
-# 6. DT summary table -----
+# 7. DT summary table -----
 
 #' Create an interactive wide-format data table.
 #'
@@ -533,7 +586,7 @@ summary_dt <- function(dt, var_label, unit_label) {
     DT::formatRound(columns = year_cols, digits = 2)
 }
 
-# 7. Sector time-series plotly chart -----
+# 8. Sector time-series plotly chart -----
 
 #' Create a time-series chart for sector-disaggregated data.
 #'
@@ -627,7 +680,7 @@ ts_plotly_by_sector <- function(dt, var_label, unit_label, labels) {
   plotly::ggplotly(p, tooltip = c("x", "y", "colour"))
 }
 
-# 8. Variable metadata introspection -----
+# 9. Variable metadata introspection -----
 
 #' Return available dimensions for a data.table of ARDECO data.
 #'
@@ -666,7 +719,7 @@ get_var_dimensions <- function(dt) {
   dims
 }
 
-# 9. Label helper functions -----
+# 10. Label helper functions -----
 
 #' Restituisce l'etichetta italiana di una variabile ARDECO.
 #'

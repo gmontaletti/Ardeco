@@ -8,10 +8,10 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 
 | Tabella | Righe | Descrizione |
 |---|---|---|
-| `ardeco_data` | 259.259 | Dati principali (59 variabili) |
+| `ardeco_data` | 257.855 | Dati principali (57 variabili) |
 | `variable_list` | 83 | Catalogo variabili ARDECO API |
-| `var_labels` | 59 | Etichette e descrizioni variabili |
-| `download_log` | 59 | Log di download (stato, tempi) |
+| `var_labels` | 57 | Etichette e descrizioni variabili |
+| `download_log` | 57 | Log di download (stato, tempi) |
 | `unit_labels` | 16 | Etichette unità di misura |
 | `sector_labels` | 13 | Etichette settori NACE |
 | `age_labels` | 10 | Etichette classi di età |
@@ -41,12 +41,12 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 
 | group_id | Etichetta | Variabili | Righe | % totale |
 |---|---|---|---|---|
-| popolazione_demografia | Popolazione e demografia | 12 | 140.192 | 54,1% |
-| formazione_capitale | Formazione del capitale | 9 | 40.534 | 15,6% |
-| pil_valore_aggiunto | PIL e valore aggiunto | 14 | 35.386 | 13,6% |
-| reddito_compensi | Reddito e compensi | 10 | 27.053 | 10,4% |
+| popolazione_demografia | Popolazione e demografia | 12 | 140.192 | 54,4% |
+| formazione_capitale | Formazione del capitale | 9 | 40.534 | 15,7% |
+| pil_valore_aggiunto | PIL e valore aggiunto | 14 | 35.386 | 13,7% |
+| reddito_compensi | Reddito e compensi | 9 | 26.273 | 10,2% |
 | occupazione_settore | Occupazione per settore | 2 | 10.140 | 3,9% |
-| mercato_lavoro | Mercato del lavoro | 12 | 5.954 | 2,3% |
+| mercato_lavoro | Mercato del lavoro | 11 | 5.330 | 2,1% |
 
 ### Unità di misura (15)
 
@@ -54,6 +54,7 @@ Database: `data/ardeco.duckdb` — dati regionali ARDECO per la Lombardia (NUTS2
 |---|---|
 | NR | Numero |
 | THS | Migliaia |
+| THS_HW | Migliaia di ore lavorate |
 | PC | Percentuale |
 | GROWRT | Tasso di crescita (‰) |
 | MIO_EUR | Milioni di euro |
@@ -74,9 +75,9 @@ TOTAL, F, M
 
 ### Classi di età (32 valori distinti nei dati)
 
-Classi con etichetta definita (10): TOTAL, Y15-39, Y15-64, Y20-64, Y40-64, Y_GE15, Y_GE65, Y_LT15, Y_LT20, Y_LT15-GE65.
+Classi con etichetta definita (10): TOTAL, Y15-39, Y15-64, Y20-64, Y40-64, Y_GE15, Y_GE65, Y_LT15, Y_LT15-GE65, Y_LT20.
 
-Classi aggiuntive presenti nei dati (22): Y10-14, Y15-19, Y15-29, Y20-24, Y20-29, Y25-29, Y25-64, Y30-34, Y35-39, Y40-44, Y45-49, Y5-9, Y50-54, Y55-59, Y60-64, Y65-69, Y70-74, Y75-79, Y80-84, Y85-89, Y_GE85, Y_GE90.
+Classi aggiuntive presenti nei dati (22): Y5-9, Y10-14, Y15-19, Y20-24, Y20-29, Y25-29, Y30-34, Y35-39, Y40-44, Y45-49, Y50-54, Y55-59, Y60-64, Y65-69, Y70-74, Y75-79, Y80-84, Y85-89, Y_GE85, Y_GE90, Y_LT5, Y_LT20-GE65.
 
 ### Settori NACE (13)
 
@@ -100,29 +101,29 @@ Classi aggiuntive presenti nei dati (22): Y10-14, Y15-19, Y15-29, Y20-24, Y20-29
 
 | Livello | Codici | Righe | % totale |
 |---|---|---|---|
-| NUTS 2 (regione) | ITC4 | 19.969 | 7,7% |
-| NUTS 3 (province) | ITC41–ITC4D (12) | 239.290 | 92,3% |
+| NUTS 2 (regione) | ITC4 | 19.861 | 7,7% |
+| NUTS 3 (province) | ITC41–ITC4D (12) | 237.994 | 92,3% |
 
-Tutte le 59 variabili sono disponibili a entrambi i livelli NUTS.
+Tutte le 57 variabili sono disponibili a entrambi i livelli NUTS.
 
 Righe per codice NUTS3:
 
 | NUTSCODE | Righe |
 |---|---|
-| ITC41 | 19.941 |
-| ITC42 | 19.941 |
-| ITC43 | 19.941 |
-| ITC44 | 19.941 |
-| ITC46 | 19.941 |
-| ITC47 | 19.941 |
-| ITC48 | 19.941 |
-| ITC49 | 19.941 |
-| ITC4A | 19.941 |
-| ITC4B | 19.941 |
-| ITC4C | 19.941 |
-| ITC4D | 19.939 |
+| ITC41 | 19.833 |
+| ITC42 | 19.833 |
+| ITC43 | 19.833 |
+| ITC44 | 19.833 |
+| ITC46 | 19.833 |
+| ITC47 | 19.833 |
+| ITC48 | 19.833 |
+| ITC49 | 19.833 |
+| ITC4A | 19.833 |
+| ITC4B | 19.833 |
+| ITC4C | 19.833 |
+| ITC4D | 19.831 |
 
-La distribuzione è uniforme tra le province (~19.941 righe ciascuna).
+La distribuzione è uniforme tra le province (~19.833 righe ciascuna).
 
 ## 4. Copertura temporale per variabile
 
@@ -148,7 +149,6 @@ La distribuzione è uniforme tra le province (~19.941 righe ciascuna).
 | RNLCN | mercato_lavoro | 1995 | 2024 | 390 | 13 |
 | RNLHT | mercato_lavoro | 1980 | 2027 | 624 | 13 |
 | RNLHTP | mercato_lavoro | 1980 | 2027 | 624 | 13 |
-| RNLHTE | mercato_lavoro | 1980 | 2027 | 624 | 13 |
 | RNLHW | mercato_lavoro | 1995 | 2024 | 390 | 13 |
 | RPECNP | mercato_lavoro | 1995 | 2024 | 390 | 13 |
 | RPUCNP | mercato_lavoro | 1995 | 2024 | 389 | 13 |
@@ -170,7 +170,6 @@ La distribuzione è uniforme tra le province (~19.941 righe ciascuna).
 | SPVGE | pil_valore_aggiunto | 1980 | 2027 | 1.833 | 13 |
 | RUWCD | reddito_compensi | 1980 | 2027 | 1.053 | 13 |
 | ROWCD | reddito_compensi | 1980 | 2027 | 1.235 | 13 |
-| RUWCDH | reddito_compensi | 1995 | 2024 | 780 | 13 |
 | ROWCDH | reddito_compensi | 1980 | 2025 | 988 | 13 |
 | RUWCDW | reddito_compensi | 1995 | 2027 | 858 | 13 |
 | ROWCDW | reddito_compensi | 1980 | 2027 | 1.040 | 13 |
@@ -196,36 +195,36 @@ Una serie temporale è definita come una combinazione unica di (VARIABLE, NUTSCO
 
 | Livello | Serie temporali |
 |---|---|
-| NUTS 2 (regione) | 511 |
-| NUTS 3 (province) | 6.084 |
-| **Totale** | **6.595** |
+| NUTS 2 (regione) | 505 |
+| NUTS 3 (province) | 6.048 |
+| **Totale** | **6.553** |
 
-Rapporto NUTS3/NUTS2: 11,9 (vicino a 12, il numero delle province).
+Rapporto NUTS3/NUTS2: 12,0 (coerente con le 12 province).
 
 ## 6. Completezza dei dati e analisi dei NULL
 
 ### Completezza VALUE
 
-Tutte le 259.259 righe hanno VALUE non nullo (100%).
+Tutte le 257.855 righe hanno VALUE non nullo (100%).
 
 ### Dimensioni opzionali: copertura
 
 | Dimensione | Righe con valore | Righe NULL | % con valore |
 |---|---|---|---|
-| UNIT | 259.259 | 0 | 100% |
-| SEX | 138.712 | 120.547 | 53,5% |
-| AGE | 138.412 | 120.847 | 53,4% |
-| SECTOR | 85.852 | 173.407 | 33,1% |
+| UNIT | 257.855 | 0 | 100% |
+| SEX | 138.712 | 119.143 | 53,8% |
+| AGE | 138.361 | 119.494 | 53,7% |
+| SECTOR | 85.852 | 172.003 | 33,3% |
 
 ### NULL per gruppo tematico
 
 | Gruppo | NULL SEX | NULL AGE | NULL SECTOR |
 |---|---|---|---|
 | popolazione_demografia | 2.288 | 2.249 | 140.192 |
-| mercato_lavoro | 5.146 | 5.536 | 5.954 |
+| mercato_lavoro | 4.522 | 4.912 | 5.330 |
 | occupazione_settore | 10.140 | 10.140 | 0 |
 | pil_valore_aggiunto | 35.386 | 35.386 | 15.106 |
-| reddito_compensi | 27.053 | 27.053 | 6.773 |
+| reddito_compensi | 26.273 | 26.273 | 5.993 |
 | formazione_capitale | 40.534 | 40.534 | 5.382 |
 
 Le dimensioni SEX e AGE sono popolate prevalentemente nelle variabili demografiche e del mercato del lavoro. SECTOR è presente nelle variabili disaggregate per settore (occupazione_settore al 100%, più le variabili con suffisso "Z" degli altri gruppi).
@@ -234,12 +233,12 @@ Le dimensioni SEX e AGE sono popolate prevalentemente nelle variabili demografic
 
 | Gruppo | Min | Mediana | Media | Max | Dev. std. |
 |---|---|---|---|---|---|
-| popolazione_demografia | -87.870 | 4.092 | 81.366 | 10.033.918 | 427.535 |
-| mercato_lavoro | 0,1 | 349 | 183.376 | 8.995.607 | 864.383 |
-| occupazione_settore | 0,3 | 1.169 | 78.470 | 2.594.733 | 263.620 |
+| popolazione_demografia | -87.870 | 4.092 | 81.366 | 10.033.918 | 427.537 |
+| mercato_lavoro | 0,1 | 220 | 204.638 | 8.995.607 | 911.303 |
+| occupazione_settore | 0,3 | 1.169 | 78.470 | 2.594.733 | 263.633 |
 | pil_valore_aggiunto | -10,9 | 2.235 | 16.503 | 578.869 | 40.090 |
-| reddito_compensi | 0,3 | 790 | 6.645 | 232.850 | 18.116 |
-| formazione_capitale | 3,5 | 386 | 6.973 | 1.207.384 | 56.241 |
+| reddito_compensi | 0,3 | 847 | 6.842 | 232.850 | 16.297 |
+| formazione_capitale | 3,5 | 386 | 6.973 | 1.207.384 | 56.242 |
 
 I valori negativi in popolazione_demografia corrispondono a saldi migratori e variazioni di popolazione. La dispersione elevata nel mercato del lavoro riflette la compresenza di unità di misura diverse (numeri assoluti, percentuali, ore).
 
@@ -264,9 +263,10 @@ Le variabili con suffisso "Z" (disaggregazione settoriale) e le demografiche per
 
 - 22 classi di età presenti nei dati (classi quinquennali Eurostat) non hanno una corrispondenza nella tabella `age_labels`, che contiene solo 10 aggregazioni. Valutare l'integrazione delle etichette mancanti.
 - Le unità I15, I20 e PCH_PRE presenti nei dati non compaiono nella tabella `unit_labels`.
-- La dimensione file (~2,4 MB) è contenuta grazie alla compressione colonnare di DuckDB.
-- La colonna ISCED11 è presente nello schema ma non contiene valori per le 59 variabili attive.
+- La dimensione file (~10,8 MB) è contenuta grazie alla compressione colonnare di DuckDB.
+- La colonna ISCED11 è presente nello schema ma non contiene valori per le 57 variabili attive.
+- Rispetto alla versione precedente del database (59 variabili, 259.259 righe), sono state rimosse le variabili RUWCDH e RNLHTE (variabili provinciali invarianti), con una riduzione netta di 1.404 righe.
 
 ---
 
-*Generato il 2026-04-10 da `data/ardeco.duckdb` (259.259 righe, 59 variabili, 6.595 serie temporali, 6 gruppi tematici).*
+*Generato il 2026-04-12 da `data/ardeco.duckdb` (257.855 righe, 57 variabili, 6.553 serie temporali, 6 gruppi tematici).*

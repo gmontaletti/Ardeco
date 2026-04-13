@@ -1,8 +1,10 @@
 # Data files
-data/*.parquet
 data/*.gpkg
 data/*.duckdb
 data/*.duckdb.wal
+
+# Archived artifacts
+reference/archive/
 
 # Quarto output
 _site/
@@ -17,3 +19,4 @@ dashboard/_site/
 
 # OS
 .DS_Store
+.Renviron

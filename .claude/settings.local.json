@@ -39,7 +39,9 @@
       "WebFetch(domain:urban.jrc.ec.europa.eu)",
       "WebFetch(domain:www.researchgate.net)",
       "WebFetch(domain:rdrr.io)",
-      "WebFetch(domain:ec.europa.eu)"
+      "WebFetch(domain:ec.europa.eu)",
+      "Bash(grep -r \"message\\\\|warning\\\\|cat\\\\|log\" /Users/giampaolomontaletti/Documents/funzioni/Ardeco/R/*.R)",
+      "Bash(grep -r \"\\\\.Renviron\\\\|Sys.getenv\\\\|PG_\" /Users/giampaolomontaletti/Documents/funzioni/Ardeco/R/*.R)"
     ]
   }
 }

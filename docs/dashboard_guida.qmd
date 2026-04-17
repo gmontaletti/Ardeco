@@ -1,0 +1,142 @@
+---
+title: "Guida alla dashboard ARDECO Lombardia"
+author: "Giampaolo Montaletti"
+lang: it
+format:
+  docx:
+    toc: false
+    number-sections: false
+fontsize: 10pt
+geometry:
+  - top=2.2cm
+  - bottom=2.2cm
+  - left=2.2cm
+  - right=2.2cm
+---
+
+# 1. Presentazione e struttura
+
+## Cos'è ARDECO e perché questa dashboard
+
+ARDECO (*Annual Regional Database of the European Commission*) è il database regionale
+gestito dal Joint Research Centre della Commissione europea. Raccoglie serie
+storiche armonizzate a livello NUTS 0–3 su popolazione, mercato del lavoro,
+PIL, valore aggiunto, compensi e formazione del capitale, con copertura che
+parte dal 1960 e viene aggiornata secondo il calendario JRC di marzo, maggio e
+novembre. I dati integrano le fonti Eurostat (conti regionali ESA 2010,
+statistiche demografiche, EU-LFS) con stime e deflatori prodotti dal JRC.
+
+La dashboard **ARDECO Lombardia** espone un sottoinsieme tematico di 57
+variabili focalizzato sulla regione NUTS-2 ITC4 (Lombardia) e sulle 12
+province NUTS-3 che la compongono. I dati provengono dal pacchetto CRAN
+`ARDECO` e sono archiviati in un database DuckDB locale
+(`data/ardeco.duckdb`) generato dalla pipeline ETL `R/01_build_duckdb.R`.
+La versione NUTS adottata è 2024.
+
+## Architettura dell'interfaccia
+
+L'applicazione è un `flexdashboard` con runtime Shiny, organizzato in sei
+pagine tematiche indipendenti. Ogni pagina presenta la stessa struttura:
+
+- **Sidebar** con il selettore di variabile e i filtri dinamici delle
+  dimensioni disponibili (unità di misura, sesso, classe di età, settore
+  NACE, livello di istruzione ISCED11). I filtri appaiono solo quando la
+  variabile selezionata li supporta.
+- **Due value box** con gli indicatori chiave della pagina: riportano il
+  valore regionale più recente e l'anno di riferimento.
+- **Mappa coropletica** Leaflet delle 12 province, con palette
+  CVD-safe e confini da `data/lombardia_nuts3.gpkg`.
+- **Grafico di serie storica** Plotly con il totale regionale in evidenza
+  e le province sovrapponibili per confronto.
+
+## Controlli interattivi
+
+Il selettore di variabile lista le variabili del gruppo tematico con
+etichetta italiana. I selettori di dimensione (UNIT, SEX, AGE, SECTOR,
+ISCED11) sono popolati dinamicamente leggendo le combinazioni effettivamente
+presenti nel dato. Ogni variazione aggiorna insieme value box, mappa e
+serie storica.
+
+
+# 2. Le sei aree tematiche
+
+Ogni pagina raggruppa variabili coerenti per dominio e condivide gli stessi
+indicatori nelle value box. La tabella sintetizza contenuto e casi d'uso.
+
+| Pagina | N. var. | Indicatori nei value box | Esempi di domande |
+|---|---|---|---|
+| Popolazione e demografia | 12 | Popolazione totale (NR); variazione per 1000 abitanti (‰) | Come evolve la popolazione lombarda? Quanto pesa il saldo migratorio rispetto a quello naturale? |
+| Mercato del lavoro | 11 | Tasso di occupazione 20–64 (%); tasso di disoccupazione 15–74 (%) | Qual è il divario occupazionale tra province? Come si muovono ore lavorate e forza lavoro? |
+| Occupazione per settore | 2 | Numero di settori NACE; ultimo anno disponibile | Come si distribuiscono occupati e ore lavorate tra i 10 settori NACE Rev. 2? |
+| PIL e valore aggiunto | 14 | PIL corrente (MIO\_EUR); PIL costante base 2015 (MIO\_EUR2015) | Qual è la dinamica reale del PIL? Come varia la produttività per ora e per occupato? |
+| Reddito e compensi | 9 | Compensi correnti (MIO\_EUR); compensi costanti base 2015 | Come evolve il compenso reale per dipendente? Che andamento ha il CLUP? |
+| Formazione del capitale | 9 | FBCF corrente (MIO\_EUR); FBCF costante base 2015 | Quanto investe la regione in capitale fisso? Come cresce lo stock di capitale netto? |
+
+Le variabili derivate (tassi, pro capite, produttività, CLUP) sono calcolate
+dal JRC a partire dai dati di base; quelle settoriali usano la
+classificazione NACE Rev. 2 a 10 settori. Le serie a prezzi costanti hanno
+anno base 2015.
+
+
+# 3. Variabili e dimensioni
+
+## Dizionario compatto delle variabili chiave
+
+| Codice | Etichetta | Unità principale |
+|---|---|---|
+| SNPTD | Popolazione media annua | NR |
+| SNPCNP | Variazione della popolazione per 1000 abitanti | GROWRT |
+| RPECNP | Tasso di occupazione (20–64 anni) | PC |
+| RPUCNP | Tasso di disoccupazione (15–74 anni) | PC |
+| RNLHT | Ore lavorate (occupati) | THS\_HW |
+| SUVGD | PIL a prezzi correnti | MIO\_EUR |
+| SOVGD | PIL a prezzi costanti (base 2015) | MIO\_EUR2015 |
+| SUVGDP | PIL pro capite a prezzi correnti | EUR\_HAB |
+| RUWCD | Compensi dei dipendenti a prezzi correnti | MIO\_EUR |
+| RUIGT | Investimenti fissi lordi (FBCF) a prezzi correnti | MIO\_EUR |
+| ROKND | Stock di capitale netto a prezzi costanti | MIO\_EUR2015 |
+
+## Unità di misura ricorrenti
+
+- **NR** — numero; **THS** — migliaia.
+- **MIO\_EUR** — milioni di euro a prezzi correnti;
+  **MIO\_EUR2015** — milioni di euro a prezzi costanti, base 2015.
+- **EUR\_HAB** — euro per abitante; **PC** — percentuale.
+- **THS\_HW** — migliaia di ore lavorate.
+- **I15 / I20** — indici concatenati base 2015 / 2020;
+  **PCH\_PRE** — variazione percentuale sull'anno precedente;
+  **GROWRT** — tasso di crescita per mille.
+
+## Copertura geografica e temporale
+
+L'ambito territoriale comprende la Lombardia NUTS-2 (codice ITC4) e le 12
+province NUTS-3 (codici ITC41–ITC4C). La copertura temporale dipende dalla
+variabile: le serie demografiche e di conti regionali partono dai primi
+anni Sessanta, mentre gli indicatori derivati più recenti coprono
+l'intervallo permesso dalle fonti sottostanti. L'ultimo anno disponibile
+coincide con l'ultimo rilascio JRC adottato in pipeline.
+
+## Fonte e aggiornamento
+
+La pipeline `R/01_build_duckdb.R` scarica le variabili via
+`ardeco_get_dataset_data()` e popola il database DuckDB
+`data/ardeco.duckdb`, che contiene sia i dati (`ardeco_data`) sia le
+tabelle di etichette italiane (`var_labels`, `unit_labels`, `sex_labels`,
+`age_labels`, `sector_labels`, `group_labels`). La dashboard legge le
+etichette dal database e le serie dalle cache in memoria.
+
+## Note di lettura
+
+- Le province sono identificate da codici NUTS-3 a cinque caratteri; il
+  totale regionale ITC4 proviene direttamente da ARDECO e **non** coincide
+  con la somma dei valori provinciali, per via dei trattamenti di
+  armonizzazione applicati dal JRC.
+- Le serie a prezzi costanti usano l'anno base 2015; confronti di lungo
+  periodo vanno interpretati tenendo conto delle revisioni periodiche dei
+  deflatori.
+- I filtri di dimensione (sesso, età, settore, ISCED11) compaiono solo per
+  le variabili che li supportano: l'assenza di un selettore indica che la
+  variabile è già aggregata su quella dimensione.
+- Gli indicatori etichettati come "derivati" nelle descrizioni sono
+  calcolati dal JRC a partire da variabili di base e possono presentare
+  discontinuità in corrispondenza di revisioni dei denominatori.

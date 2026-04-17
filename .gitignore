@@ -11,6 +11,9 @@ _site/
 dashboard/_site/
 .quarto/
 
+# Pipeline exports
+output/
+
 # RStudio
 .Rproj.user/
 *.Rhistory

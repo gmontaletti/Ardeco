@@ -41,7 +41,13 @@
       "WebFetch(domain:rdrr.io)",
       "WebFetch(domain:ec.europa.eu)",
       "Bash(grep -r \"message\\\\|warning\\\\|cat\\\\|log\" /Users/giampaolomontaletti/Documents/funzioni/Ardeco/R/*.R)",
-      "Bash(grep -r \"\\\\.Renviron\\\\|Sys.getenv\\\\|PG_\" /Users/giampaolomontaletti/Documents/funzioni/Ardeco/R/*.R)"
+      "Bash(grep -r \"\\\\.Renviron\\\\|Sys.getenv\\\\|PG_\" /Users/giampaolomontaletti/Documents/funzioni/Ardeco/R/*.R)",
+      "Bash(zip --version)",
+      "Bash(zip -r ardeco-pipeline-container.zip ardeco-pipeline-container)",
+      "Bash(unzip -l ardeco-pipeline-container.zip)",
+      "Bash(set -e)",
+      "Bash(zip -rq ardeco-pipeline-container.zip ardeco-pipeline-container)",
+      "Bash(unzip -p ardeco-pipeline-container.zip ardeco-pipeline-container/Dockerfile)"
     ]
   }
 }

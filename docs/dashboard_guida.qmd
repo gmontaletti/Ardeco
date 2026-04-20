@@ -28,34 +28,7 @@ statistiche demografiche, EU-LFS) con stime e deflatori prodotti dal JRC.
 
 La dashboard **ARDECO Lombardia** espone un sottoinsieme tematico di 57
 variabili focalizzato sulla regione NUTS-2 ITC4 (Lombardia) e sulle 12
-province NUTS-3 che la compongono. I dati provengono dal pacchetto CRAN
-`ARDECO` e sono archiviati in un database DuckDB locale
-(`data/ardeco.duckdb`) generato dalla pipeline ETL `R/01_build_duckdb.R`.
-La versione NUTS adottata è 2024.
-
-## Architettura dell'interfaccia
-
-L'applicazione è un `flexdashboard` con runtime Shiny, organizzato in sei
-pagine tematiche indipendenti. Ogni pagina presenta la stessa struttura:
-
-- **Sidebar** con il selettore di variabile e i filtri dinamici delle
-  dimensioni disponibili (unità di misura, sesso, classe di età, settore
-  NACE, livello di istruzione ISCED11). I filtri appaiono solo quando la
-  variabile selezionata li supporta.
-- **Due value box** con gli indicatori chiave della pagina: riportano il
-  valore regionale più recente e l'anno di riferimento.
-- **Mappa coropletica** Leaflet delle 12 province, con palette
-  CVD-safe e confini da `data/lombardia_nuts3.gpkg`.
-- **Grafico di serie storica** Plotly con il totale regionale in evidenza
-  e le province sovrapponibili per confronto.
-
-## Controlli interattivi
-
-Il selettore di variabile lista le variabili del gruppo tematico con
-etichetta italiana. I selettori di dimensione (UNIT, SEX, AGE, SECTOR,
-ISCED11) sono popolati dinamicamente leggendo le combinazioni effettivamente
-presenti nel dato. Ogni variazione aggiorna insieme value box, mappa e
-serie storica.
+province NUTS-3 che la compongono. 
 
 
 # 2. Le sei aree tematiche
@@ -116,16 +89,6 @@ anni Sessanta, mentre gli indicatori derivati più recenti coprono
 l'intervallo permesso dalle fonti sottostanti. L'ultimo anno disponibile
 coincide con l'ultimo rilascio JRC adottato in pipeline.
 
-## Fonte e aggiornamento
-
-La pipeline `R/01_build_duckdb.R` scarica le variabili via
-`ardeco_get_dataset_data()` e popola il database DuckDB
-`data/ardeco.duckdb`, che contiene sia i dati (`ardeco_data`) sia le
-tabelle di etichette italiane (`var_labels`, `unit_labels`, `sex_labels`,
-`age_labels`, `sector_labels`, `group_labels`). La dashboard legge le
-etichette dal database e le serie dalle cache in memoria.
-
-## Note di lettura
 
 - Le province sono identificate da codici NUTS-3 a cinque caratteri; il
   totale regionale ITC4 proviene direttamente da ARDECO e **non** coincide
@@ -134,9 +97,6 @@ etichette dal database e le serie dalle cache in memoria.
 - Le serie a prezzi costanti usano l'anno base 2015; confronti di lungo
   periodo vanno interpretati tenendo conto delle revisioni periodiche dei
   deflatori.
-- I filtri di dimensione (sesso, età, settore, ISCED11) compaiono solo per
-  le variabili che li supportano: l'assenza di un selettore indica che la
-  variabile è già aggregata su quella dimensione.
 - Gli indicatori etichettati come "derivati" nelle descrizioni sono
   calcolati dal JRC a partire da variabili di base e possono presentare
   discontinuità in corrispondenza di revisioni dei denominatori.

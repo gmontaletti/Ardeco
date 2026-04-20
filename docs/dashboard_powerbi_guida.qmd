@@ -1,0 +1,768 @@
+---
+title: "Guida sviluppatore: dashboard ARDECO Lombardia in Power BI"
+author: "Giampaolo Montaletti"
+lang: it
+format:
+  docx:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+fontsize: 10pt
+geometry:
+  - top=2.2cm
+  - bottom=2.2cm
+  - left=2.2cm
+  - right=2.2cm
+---
+
+# Introduzione e obiettivo
+
+## Contesto
+
+ARDECO (*Annual Regional Database of the European Commission*) è il database
+regionale gestito dal Joint Research Centre. Il presente progetto espone un
+sottoinsieme tematico di 57 variabili focalizzato sulla regione NUTS-2
+**ITC4 (Lombardia)** e sulle 12 province NUTS-3 che la compongono
+(ITC41–ITC4D). La dashboard di riferimento è implementata in R come
+`flexdashboard + Shiny` e legge i dati da DuckDB; il codice sorgente si trova
+nella cartella `dashboard/` del repository.
+
+## Obiettivo del documento
+
+Questa guida descrive come realizzare una dashboard **equivalente in Power
+BI** partendo dai dati già disponibili su PostgreSQL. Il documento è
+destinato allo sviluppatore Power BI e copre: accesso ai dati, modello
+semantico, misure DAX, impaginazione delle sei pagine, tema accessibile
+(CVD-safe), interattività e aggiornamento schedulato.
+
+Obiettivo funzionale: mantenere la parità con la dashboard R esistente in
+termini di indicatori esposti (value box), rappresentazione geografica
+(coropleta NUTS-3), andamenti temporali (serie storica con totale regionale
+e province) e filtri dimensionali (variabile, unità, sesso, età, settore).
+
+## Vincoli e assunzioni
+
+- Output finale: file `.pbix` pubblicato su Power BI Service.
+- Nessuna componente server R o Python nel deliverable.
+- Aggiornamento dati secondo calendario JRC: marzo, maggio, novembre.
+- Lingua di interfaccia: italiano. Tutte le etichette di variabili, unità,
+  classificazioni NACE e ripartizioni demografiche sono già tradotte nelle
+  tabelle di lookup.
+
+# Architettura dati sorgente
+
+## Backend di riferimento
+
+Il backend dati ufficiale per la dashboard Power BI è **PostgreSQL, schema
+`ardeco`**, popolato dal container Docker presente nel repository (vedi
+`Dockerfile` e commit `feat: add containerized ARDECO->PostgreSQL pipeline
+and Excel export`). Lo schema è isomorfo al file DuckDB `data/ardeco.duckdb`
+usato dalla dashboard R: medesimi nomi di tabella, colonne, tipi e chiavi.
+
+Lo sviluppatore Power BI **non deve ricostruire la pipeline**: le tabelle
+sono già pronte e aggiornate dal container.
+
+## Schema della tabella dei fatti
+
+Tabella `ardeco.ardeco_data` — 12 colonne:
+
+| Colonna | Tipo | Null | Descrizione |
+|---|---|---|---|
+| VARIABLE | VARCHAR | No | Codice variabile (4–6 caratteri), es. SUVGD |
+| VERSIONS | INTEGER | Sì | Anno di classificazione NUTS (2016, 2021, 2024) |
+| LEVEL | INTEGER | Sì | Livello NUTS: 2 (regione), 3 (provincia) |
+| NUTSCODE | VARCHAR | No | Codice NUTS, es. ITC4, ITC46 |
+| YEAR | INTEGER | No | Anno di riferimento |
+| UNIT | VARCHAR | Sì | Codice unità di misura, es. MIO_EUR |
+| VALUE | DOUBLE | Sì | Valore numerico |
+| SEX | VARCHAR | Sì | Sesso: TOTAL, F, M o NULL |
+| AGE | VARCHAR | Sì | Fascia d'età: TOTAL, Y20-64, Y_GE65, ecc., o NULL |
+| SECTOR | VARCHAR | Sì | Settore NACE Rev. 2, o NULL |
+| ISCED11 | VARCHAR | Sì | Livello istruzione (riservato, attualmente inutilizzato) |
+| THEMATIC_GROUP | VARCHAR | No | Gruppo tematico (uno dei 6 ambiti) |
+
+Indici presenti: `idx_variable` su `VARIABLE`,
+`idx_nuts_year` su `(NUTSCODE, YEAR)`.
+
+## Tabelle di lookup
+
+Sei tabelle contengono le etichette italiane per la decodifica:
+
+| Tabella | Chiave | Colonne aggiuntive | Righe |
+|---|---|---|---|
+| `var_labels` | `var_code` | `label_it`, `group_id`, `description_it` | 57 |
+| `unit_labels` | `code` | `label_it` | 19 |
+| `sex_labels` | `code` | `label_it` | 3 |
+| `age_labels` | `code` | `label_it` | 32 |
+| `sector_labels` | `code` | `label_it` | 13 |
+| `group_labels` | `group_id` | `label_it` | 6 |
+
+## Copertura geografica
+
+- **NUTS-2**: ITC4 (Lombardia) — usato come totale regionale.
+- **NUTS-3**: 12 province con prefisso ITC4 (elenco in appendice B).
+- Geometrie: file `data/lombardia_nuts3.gpkg` (GeoPackage, EPSG:4326) con 13
+  poligoni (12 province + contorno regionale).
+
+## Copertura temporale
+
+Serie storiche dal 1960 per le variabili demografiche; dagli anni Ottanta
+per la maggior parte degli indicatori economici. L'ultimo anno disponibile
+coincide con l'ultimo rilascio JRC acquisito dalla pipeline.
+
+## Nota sugli aggregati
+
+Il totale regionale ITC4 proviene direttamente da ARDECO e **non coincide**
+con la somma dei valori provinciali, per via dei trattamenti di
+armonizzazione applicati dal JRC. Le misure DAX devono trattare ITC4 come
+entità a sé e **non** come somma delle 12 province.
+
+# Accesso ai dati da Power BI
+
+## Connessione
+
+Lo sviluppatore riceve le credenziali PostgreSQL (host, porta, database,
+utente read-only). La connessione si stabilisce tramite il connettore
+nativo Power BI **PostgreSQL database**, che richiede il provider Npgsql
+installato sulla macchina dello sviluppatore e sul gateway on-premises.
+
+Parametri di connessione:
+
+- Server: `<host>:<porta>` (fornito a parte)
+- Database: `<nome_db>`
+- Schema: `ardeco`
+- Data connectivity mode: **Import** (consigliato, dataset < 1 M righe)
+
+DirectQuery è sconsigliato: il volume dati è modesto e l'interattività
+desiderata richiede il motore in-memory di Power BI.
+
+## Tabelle da importare
+
+Importare le sette tabelle dello schema `ardeco`:
+
+- `ardeco.ardeco_data` (tabella dei fatti)
+- `ardeco.var_labels`
+- `ardeco.unit_labels`
+- `ardeco.sex_labels`
+- `ardeco.age_labels`
+- `ardeco.sector_labels`
+- `ardeco.group_labels`
+
+Durante l'import, disattivare l'opzione "Include relationship columns" per
+evitare che Power BI crei relazioni spurie basate su nomi colonna omonimi.
+
+## Query folding
+
+Mantenere le trasformazioni Power Query al minimo indispensabile
+(rinominare colonne, impostare tipi). Ogni passo che interrompe il query
+folding forza Power BI a caricare l'intera tabella prima di filtrare:
+evitare in particolare l'uso di funzioni M come `Table.AddColumn` con
+espressioni complesse o `Table.FuzzyJoin`.
+
+## Importazione delle geometrie NUTS-3
+
+Power BI non legge il formato GeoPackage in modo nativo. Convertire
+`data/lombardia_nuts3.gpkg` in **TopoJSON** (formato richiesto dal visual
+Shape map) oppure in **GeoJSON** (per ArcGIS Maps for Power BI o custom
+visual Mapbox):
+
+```bash
+# Conversione con GDAL
+ogr2ogr -f GeoJSON lombardia_nuts3.geojson data/lombardia_nuts3.gpkg
+
+# Oppure TopoJSON tramite Node.js
+npx geo2topo lombardia_nuts3.geojson > lombardia_nuts3.topojson
+```
+
+Verificare che la proprietà di join nel file esportato sia `NUTS_ID`
+(campo chiave per collegare le geometrie alla tabella dei fatti).
+
+## Gateway on-premises
+
+Se l'istanza PostgreSQL è raggiungibile solo dalla rete aziendale, è
+necessario installare e registrare il **gateway dati Power BI** sulla
+macchina che ha accesso al database. In ambiente cloud (PostgreSQL gestito
+con endpoint pubblico o VNet Power BI) il gateway non serve.
+
+# Modello dati Power BI
+
+## Schema a stella
+
+Il modello segue uno schema a stella con una fact table centrale e sei
+tabelle dimensionali:
+
+```
+          dim_group
+             |
+             v
+dim_variable --+                   dim_geo
+dim_unit    --+                       |
+dim_sex     --+--> ardeco_data <------+
+dim_age     --+
+dim_sector  --+
+```
+
+## Tabelle del modello
+
+| Tabella | Tipo | Chiave | Note |
+|---|---|---|---|
+| `ardeco_data` | Fatti | composta (VARIABLE, NUTSCODE, YEAR, UNIT, SEX, AGE, SECTOR) | Import, ~1 M righe |
+| `dim_variable` | Dimensione | `var_code` | Da `var_labels` |
+| `dim_unit` | Dimensione | `code` | Da `unit_labels` |
+| `dim_sex` | Dimensione | `code` | Da `sex_labels` |
+| `dim_age` | Dimensione | `code` | Da `age_labels` |
+| `dim_sector` | Dimensione | `code` | Da `sector_labels` |
+| `dim_group` | Dimensione | `group_id` | Da `group_labels` |
+| `dim_geo` | Dimensione | `NUTS_ID` | Importata da GeoJSON/TopoJSON con attributi (`NUTS_ID`, `NAME_LATN`, `LEVEL`) |
+
+## Relazioni
+
+Impostare relazioni 1-a-molti da ciascuna dimensione verso la fact table,
+cardinalità singola, filtro unidirezionale (dimensione → fatti):
+
+- `dim_variable[var_code]` ↔ `ardeco_data[VARIABLE]`
+- `dim_unit[code]` ↔ `ardeco_data[UNIT]`
+- `dim_sex[code]` ↔ `ardeco_data[SEX]`
+- `dim_age[code]` ↔ `ardeco_data[AGE]`
+- `dim_sector[code]` ↔ `ardeco_data[SECTOR]`
+- `dim_group[group_id]` ↔ `ardeco_data[THEMATIC_GROUP]`
+- `dim_geo[NUTS_ID]` ↔ `ardeco_data[NUTSCODE]`
+
+Non impostare filtri bidirezionali: la propagazione transitiva tra
+dimensioni porterebbe a conteggi errati nei KPI.
+
+## Colonne calcolate utili
+
+Aggiungere a `ardeco_data` (o a `dim_geo`) una colonna calcolata per
+distinguere il livello NUTS in modo leggibile:
+
+```dax
+Tipo_NUTS =
+SWITCH(
+    'ardeco_data'[LEVEL],
+    2, "Regione",
+    3, "Provincia",
+    "Altro"
+)
+```
+
+Aggiungere a `dim_variable` il collegamento al nome di gruppo italiano
+(relazione via `group_id`), così da poter costruire slicer gerarchici
+Gruppo → Variabile.
+
+# Misure DAX fondamentali
+
+Tutte le misure sono da definire nella fact table `ardeco_data`. Le misure
+di formato restituiscono testo e sono pensate per i titoli dei value box
+(requisito: **l'anno di riferimento deve comparire nel titolo o nel
+sottotitolo della card**).
+
+## Misure base
+
+```dax
+-- Ultimo anno presente nel contesto filtrato
+Ultimo_anno = MAX('ardeco_data'[YEAR])
+
+-- Valore dell'ultimo anno disponibile nel contesto filtrato
+Valore_ultimo_anno =
+CALCULATE(
+    SUM('ardeco_data'[VALUE]),
+    'ardeco_data'[YEAR] = [Ultimo_anno]
+)
+
+-- Valore totale regionale (ITC4), ultimo anno
+Valore_regionale_ITC4 =
+CALCULATE(
+    [Valore_ultimo_anno],
+    'ardeco_data'[NUTSCODE] = "ITC4"
+)
+
+-- Numero di settori NACE distinti (per la pagina "Occupazione per settore")
+N_settori_disponibili =
+CALCULATE(
+    DISTINCTCOUNT('ardeco_data'[SECTOR]),
+    NOT ISBLANK('ardeco_data'[SECTOR])
+)
+```
+
+## Misure di formato italiano
+
+Power BI non offre separatore migliaia "." e virgola decimale "," in modo
+nativo sulla KPI card in tutte le impostazioni internazionali; si usano
+misure di testo dedicate:
+
+```dax
+Formato_big_mark =
+VAR v = [Valore_regionale_ITC4]
+RETURN
+    FORMAT(v, "#.##0", "it-IT")
+
+Formato_percentuale =
+VAR v = [Valore_regionale_ITC4]
+RETURN
+    FORMAT(v, "0,0", "it-IT") & "%"
+
+Formato_per_mille =
+VAR v = [Valore_regionale_ITC4]
+RETURN
+    FORMAT(v, "0,00", "it-IT") & "‰"
+```
+
+## Titolo card con anno
+
+Per rispettare il requisito che l'anno compaia nella card:
+
+```dax
+Titolo_card =
+VAR anno = [Ultimo_anno]
+VAR etichetta = SELECTEDVALUE('dim_variable'[label_it])
+RETURN
+    etichetta & " (" & anno & ")"
+```
+
+Impostare il titolo dinamico della visual card collegandolo a questa
+misura.
+
+## Misura diagnostica (monitoraggio refresh)
+
+```dax
+Diagnostica_righe =
+"Righe: " & FORMAT(COUNTROWS('ardeco_data'), "#.##0", "it-IT") &
+" | Ultimo anno: " & [Ultimo_anno]
+```
+
+# Layout delle sei pagine
+
+Ogni pagina segue lo stesso schema:
+
+1. **Pannello slicer laterale** (sinistra, larghezza ~220 px)
+   - Slicer variabile (dropdown, valori da `dim_variable` filtrato sul
+     gruppo della pagina)
+   - Slicer dimensioni secondarie (unità, sesso, età, settore) — visibili
+     solo se la variabile selezionata le supporta
+   - Descrizione testuale della variabile (card di testo da
+     `dim_variable[description_it]`)
+2. **Fascia superiore** (altezza ~120 px)
+   - Due **KPI card** affiancate (value box)
+3. **Fascia principale** (altezza ~880 px, due colonne)
+   - Colonna sinistra: **mappa coropletica NUTS-3** (ArcGIS Maps o Azure
+     Maps con shape file)
+   - Colonna destra: **grafico a linee** (serie storica)
+
+## Pagina 1 — Popolazione e demografia
+
+- Gruppo: `popolazione_demografia`
+- Variabili (12): SNPTD, SNPTN, SNPTZ, SNPBN, SNPDN, SNPDZ, SNPNN, SNMTN,
+  SNPCN, SNPCNP, SNMTNP, SPPAN
+- Dimensioni applicabili: UNIT, SEX, AGE
+- **KPI 1**: Popolazione totale (Lombardia) — variabile SNPTD, unità NR,
+  formato `big.mark` (es. `10.123.456`). Icona suggerita: utenti/persone.
+- **KPI 2**: Variazione popolazione (Lombardia) — variabile SNPCN, unità
+  GROWRT, formato `0,00‰`. Icona: linea in crescita.
+
+## Pagina 2 — Mercato del lavoro
+
+- Gruppo: `mercato_lavoro`
+- Variabili (11): RPECNP, RPUCNP, SNETD, SNETDP, SNWTD, RNECN, RNUTN,
+  RNLCN, RNLHT, RNLHTP, RNLHW
+- Dimensioni applicabili: UNIT, SEX, AGE
+- **KPI 1**: Tasso di occupazione (Lombardia) — variabile RPECNP, unità
+  PC, formato `0,0%`. Icona: valigetta.
+- **KPI 2**: Tasso di disoccupazione (Lombardia) — variabile RPUCNP,
+  unità PC, formato `0,0%`. Icona: utente barrato.
+
+## Pagina 3 — Occupazione per settore
+
+- Gruppo: `occupazione_settore`
+- Variabili (2): SNETZ, RNLHZ
+- Dimensioni applicabili: UNIT, SECTOR (critica)
+- **KPI 1**: Settori NACE disponibili — misura `N_settori_disponibili`,
+  formato intero. Icona: edificio.
+- **KPI 2**: Ultimo anno disponibile — misura `Ultimo_anno`, formato
+  intero. Icona: calendario.
+
+**Nota**: questa pagina sostituisce il classico grafico con una versione
+settoriale: linee colorate, una per ciascun settore NACE, aggregando i
+valori sulle 12 province (somma o media secondo l'unità).
+
+## Pagina 4 — PIL e valore aggiunto
+
+- Gruppo: `pil_valore_aggiunto`
+- Variabili (14): SUVGD, SOVGD, SUVGE, SOVGE, SUVGZ, SOVGZ, SUVGDH,
+  SUVGDE, SOVGDH, SOVGDE, SUVGDP, SOVGDP, SPVGD, SPVGE
+- Dimensioni applicabili: UNIT, SECTOR (per SUVGZ/SOVGZ)
+- **KPI 1**: PIL corrente (Lombardia) — variabile SUVGD, unità MIO_EUR,
+  formato `big.mark`. Icona: euro.
+- **KPI 2**: PIL costante (Lombardia) — variabile SOVGD, unità
+  MIO_EUR2015, formato `big.mark`. Icona: grafico a barre.
+
+## Pagina 5 — Reddito e compensi
+
+- Gruppo: `reddito_compensi`
+- Variabili (9): RUWCD, ROWCD, ROWCDH, RUWCDW, ROWCDW, RUWCDHH, RUWCDWE,
+  RUWCZ, ROWCZ
+- Dimensioni applicabili: UNIT, SECTOR
+- **KPI 1**: Compensi correnti (Lombardia) — variabile RUWCD, unità
+  MIO_EUR, formato `big.mark`. Icona: portafoglio.
+- **KPI 2**: Compensi costanti (Lombardia) — variabile ROWCD, unità
+  MIO_EUR2015, formato `big.mark`. Icona: portafoglio.
+
+## Pagina 6 — Formazione del capitale
+
+- Gruppo: `formazione_capitale`
+- Variabili (9): RUIGT, ROIGT, RUIGZ, ROIGZ, ROKND, SUKCT, SOKCT, SUKCZ,
+  SOKCZ
+- Dimensioni applicabili: UNIT, SECTOR
+- **KPI 1**: FBCF corrente (Lombardia) — variabile RUIGT, unità MIO_EUR,
+  formato `big.mark`. Icona: martello.
+- **KPI 2**: FBCF costante (Lombardia) — variabile ROIGT, unità
+  MIO_EUR2015, formato `big.mark`. Icona: attrezzi.
+
+## Sintesi KPI
+
+| Pagina | KPI 1 var / unità | KPI 2 var / unità | Formato |
+|---|---|---|---|
+| Popolazione | SNPTD / NR | SNPCN / GROWRT | big.mark; `0,00‰` |
+| Lavoro | RPECNP / PC | RPUCNP / PC | `0,0%`; `0,0%` |
+| Occupazione settore | N_settori | Ultimo_anno | intero; intero |
+| PIL | SUVGD / MIO_EUR | SOVGD / MIO_EUR2015 | big.mark; big.mark |
+| Reddito | RUWCD / MIO_EUR | ROWCD / MIO_EUR2015 | big.mark; big.mark |
+| Capitale | RUIGT / MIO_EUR | ROIGT / MIO_EUR2015 | big.mark; big.mark |
+
+## Specifiche mappa coropletica
+
+- **Visual**: ArcGIS Maps for Power BI o Azure Maps (fill layer) — non
+  usare il visual Map standard, che non supporta join su shapefile
+  personalizzati.
+- **Fonte geometrie**: `lombardia_nuts3.geojson` (o TopoJSON).
+- **Chiave di join**: `NUTS_ID` ↔ `ardeco_data[NUTSCODE]`.
+- **Campo misura**: `[Valore_ultimo_anno]` filtrato sulla variabile e
+  unità selezionate.
+- **Scala colore**: palette Blues sequenziale (5 classi), valori mancanti
+  in grigio chiaro `#CCCCCC`.
+- **Tile di base**: cartografia neutra chiara (CartoDB Positron o
+  equivalente Azure Maps "grayscale_light").
+- **Popup**: `NUTS_ID`, `NAME_LATN`, etichetta variabile, anno, valore.
+- **Estensione iniziale**: bounding box Lombardia
+  `[8.49, 44.68]` ↔ `[11.43, 46.64]`.
+
+## Specifiche grafico serie storica
+
+- **Visual**: Line chart nativo Power BI, asse X = `YEAR`, valori =
+  `[Valore_ultimo_anno]` (o misura equivalente senza filtro temporale).
+- **Serie**: `NUTSCODE` (una linea per provincia + 1 per ITC4).
+- **Differenziazione regione vs province**:
+  - ITC4 (regione): linea nera spessa (3 px), sempre visibile.
+  - ITC41–ITC4D (province): linee sottili (1,5 px), colore CVD-safe,
+    nascoste di default tramite legenda (l'utente le attiva cliccando).
+- **Legenda**: orizzontale in basso, etichette con `NAME_LATN` (nome
+  provincia in italiano).
+- **Tooltip**: mostra nome provincia, anno, valore formattato.
+- Per raggiungere il comportamento "nascoste di default", impostare nelle
+  condizioni di formattazione la trasparenza al 100% per le serie
+  diverse da ITC4; l'utente ripristina la visibilità dalla legenda.
+
+# Tema colore accessibile (CVD-safe)
+
+## Palette
+
+La dashboard R usa una combinazione delle palette **Paul Tol** e
+**Okabe-Ito** per garantire distinguibilità con deuteranopia, protanopia
+e tritanopia:
+
+| # | Hex |
+|---|---|
+| 1 | `#CC6677` |
+| 2 | `#332288` |
+| 3 | `#DDCC77` |
+| 4 | `#117733` |
+| 5 | `#88CCEE` |
+| 6 | `#882255` |
+| 7 | `#44AA99` |
+| 8 | `#999933` |
+| 9 | `#AA4499` |
+| 10 | `#E69F00` |
+| 11 | `#56B4E9` |
+| 12 | `#D55E00` |
+
+## File tema `ardeco_theme.json`
+
+Struttura minima da salvare e applicare via **Visualizzazioni > Sfoglia
+temi > Cerca temi**:
+
+```json
+{
+  "name": "ARDECO Lombardia",
+  "dataColors": [
+    "#CC6677", "#332288", "#DDCC77", "#117733",
+    "#88CCEE", "#882255", "#44AA99", "#999933",
+    "#AA4499", "#E69F00", "#56B4E9", "#D55E00"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#222222",
+  "tableAccent": "#332288"
+}
+```
+
+## Codifica ridondante
+
+Nei grafici con molte serie (serie storica provinciale, pagina settori),
+affiancare al colore un pattern di linea:
+
+| Indice serie | Stile linea |
+|---|---|
+| 0, 4, 8 | solid |
+| 1, 5, 9 | dash |
+| 2, 6, 10 | dot |
+| 3, 7, 11 | dashdot |
+
+Questa ridondanza garantisce distinguibilità anche per utenti con
+dicromatismo grave e per stampe in scala di grigi.
+
+# Interattività e drill-through
+
+## Sincronizzazione slicer
+
+Attivare **Sync slicers** tra le sei pagine per gli slicer di unità e
+anno (quando presente). Gli slicer di variabile restano indipendenti, in
+quanto ciascuna pagina espone solo le variabili del proprio gruppo.
+
+## Tooltip personalizzati
+
+Creare una pagina nascosta `Tooltip_provincia` con un mini line chart
+(ultimi 10 anni) e due KPI (valore ultimo anno, variazione vs. 5 anni
+prima). Collegarla alla mappa tramite la proprietà *Tooltip page*.
+
+## Bookmark
+
+Configurare almeno due bookmark per pagina:
+
+- **Vista regione**: solo ITC4 visibile nel grafico; mappa in scala di
+  intensità piena.
+- **Vista regione + province**: tutte le serie visibili; legenda
+  completa.
+
+## Drill-through
+
+Pagina dedicata `Dettaglio_provincia` raggiungibile via drill-through dal
+campo `NUTSCODE` di qualunque visual. La pagina mostra tutte le
+variabili del gruppo corrente per la provincia selezionata.
+
+# Aggiornamento dati
+
+## Sorgente di verità
+
+Lo schema `ardeco` su PostgreSQL è alimentato dal container Docker
+(pipeline: ARDECO CRAN → DuckDB → PostgreSQL). Lo sviluppatore Power BI
+**non interviene sulla pipeline**; si limita a consumare le tabelle.
+
+## Scheduled refresh
+
+Configurare il refresh in **Power BI Service** con cadenza allineata al
+calendario JRC:
+
+- **Marzo** (rilascio primaverile)
+- **Maggio** (rilascio estivo)
+- **Novembre** (rilascio autunnale)
+
+È prudente programmare un refresh il secondo lunedì di ciascuno di
+questi mesi, dopo la finestra tipica di aggiornamento del JRC.
+
+## Gateway
+
+Necessario se l'istanza PostgreSQL è on-premises o in VNet privata. In
+caso contrario (endpoint pubblico, SSL obbligatorio), Power BI Service si
+connette direttamente.
+
+## Monitoraggio
+
+Creare una pagina diagnostica nascosta (accessibile all'amministratore)
+con:
+
+- Card `Diagnostica_righe` (misura DAX definita in §5).
+- Card `Ultimo_anno` per ciascuna variabile principale, per rilevare
+  rilasci parziali.
+- Data e ora dell'ultimo refresh (disponibile come metadata Power BI).
+
+## Versioning NUTS
+
+La colonna `VERSIONS` identifica l'anno di classificazione NUTS
+(2016, 2021, 2024). Per default filtrare sulla versione più recente
+disponibile:
+
+```dax
+Versione_corrente = MAX('ardeco_data'[VERSIONS])
+
+Valore_versione_corrente =
+CALCULATE(
+    [Valore_ultimo_anno],
+    'ardeco_data'[VERSIONS] = [Versione_corrente]
+)
+```
+
+# Checklist di validazione
+
+Prima della consegna, verificare:
+
+- [ ] Confronto numerico dei KPI regionali (ITC4, ultimo anno) tra la
+  dashboard R (`dashboard/index.Rmd`) e la versione Power BI: tolleranza
+  zero. Un disallineamento indica un filtro di unità o anno errato.
+- [ ] Coerenza delle etichette italiane: nessun codice grezzo (es. `SUVGD`,
+  `MIO_EUR2015`, `Y20-64`) visibile in slicer, tooltip o legende.
+- [ ] Accessibilità cromatica: test con simulatore CVD (Coblis, Sim Daltonism
+  o estensione browser) per deuteranopia, protanopia, tritanopia.
+- [ ] Responsive su risoluzioni `1920×1080` e `1366×768` — la card KPI non
+  deve troncare la cifra.
+- [ ] Ogni value box mostra **anno di riferimento** nel titolo o
+  sottotitolo (requisito progetto).
+- [ ] Aggiornamento schedulato validato su Power BI Service con log
+  refresh verde.
+
+# Appendici
+
+## Appendice A — Elenco completo delle 57 variabili
+
+### A.1 Popolazione e demografia (12)
+
+| Codice | Etichetta |
+|---|---|
+| SNPTD | Popolazione media annua |
+| SNPTN | Popolazione al 1° gennaio per fascia d'età e sesso |
+| SNPTZ | Popolazione al 1° gennaio per classi quinquennali e sesso |
+| SNPBN | Nati vivi per sesso |
+| SNPDN | Decessi per fascia d'età e sesso |
+| SNPDZ | Decessi per classi quinquennali e sesso |
+| SNPNN | Variazione naturale della popolazione |
+| SNMTN | Migrazione netta per fascia d'età e sesso |
+| SNPCN | Variazione della popolazione per fascia d'età e sesso |
+| SNPCNP | Variazione della popolazione per 1000 abitanti |
+| SNMTNP | Migrazione netta per 1000 abitanti |
+| SPPAN | Indice di dipendenza (rapporto alla popolazione 20-64) |
+
+### A.2 Mercato del lavoro (11)
+
+| Codice | Etichetta |
+|---|---|
+| RPECNP | Tasso di occupazione (20-64 anni) |
+| RPUCNP | Tasso di disoccupazione (15-74 anni) |
+| SNETD | Occupazione workplace-based |
+| SNETDP | Occupazione pro capite |
+| SNWTD | Dipendenti workplace-based |
+| RNECN | Occupati per età e sesso |
+| RNUTN | Disoccupati |
+| RNLCN | Forza lavoro (15 anni e oltre) |
+| RNLHT | Ore lavorate (occupati) |
+| RNLHTP | Ore lavorate pro capite |
+| RNLHW | Ore lavorate (dipendenti) |
+
+### A.3 Occupazione per settore (2)
+
+| Codice | Etichetta |
+|---|---|
+| SNETZ | Occupazione per settore NACE |
+| RNLHZ | Ore lavorate per settore NACE |
+
+### A.4 PIL e valore aggiunto (14)
+
+| Codice | Etichetta |
+|---|---|
+| SUVGD | PIL a prezzi correnti |
+| SOVGD | PIL a prezzi costanti |
+| SUVGE | Valore aggiunto a prezzi correnti |
+| SOVGE | Valore aggiunto a prezzi costanti |
+| SUVGZ | Valore aggiunto per settore a prezzi correnti |
+| SOVGZ | Valore aggiunto per settore a prezzi costanti |
+| SUVGDH | Produttività nominale per ora lavorata |
+| SUVGDE | Produttività nominale per occupato |
+| SOVGDH | Produttività reale per ora lavorata |
+| SOVGDE | Produttività reale per occupato |
+| SUVGDP | PIL pro capite a prezzi correnti |
+| SOVGDP | PIL pro capite a prezzi costanti |
+| SPVGD | Tasso di crescita del PIL (indice concatenato) |
+| SPVGE | Tasso di crescita del VA (indice concatenato) |
+
+### A.5 Reddito e compensi (9)
+
+| Codice | Etichetta |
+|---|---|
+| RUWCD | Compensi dei dipendenti a prezzi correnti |
+| ROWCD | Compensi dei dipendenti a prezzi costanti |
+| ROWCDH | Compenso reale per ora lavorata |
+| RUWCDW | Compenso nominale per dipendente |
+| ROWCDW | Compenso reale per dipendente |
+| RUWCDHH | Costo del lavoro per unità di prodotto nominale (ore) |
+| RUWCDWE | Costo del lavoro per unità di prodotto nominale (persone) |
+| RUWCZ | Compensi per settore a prezzi correnti |
+| ROWCZ | Compensi per settore a prezzi costanti |
+
+### A.6 Formazione del capitale (9)
+
+| Codice | Etichetta |
+|---|---|
+| RUIGT | Investimenti fissi lordi a prezzi correnti |
+| ROIGT | Investimenti fissi lordi a prezzi costanti |
+| RUIGZ | Investimenti fissi lordi per settore a prezzi correnti |
+| ROIGZ | Investimenti fissi lordi per settore a prezzi costanti |
+| ROKND | Stock di capitale a prezzi costanti |
+| SUKCT | Ammortamenti a prezzi correnti |
+| SOKCT | Ammortamenti a prezzi costanti |
+| SUKCZ | Ammortamenti per settore a prezzi correnti |
+| SOKCZ | Ammortamenti per settore a prezzi costanti |
+
+## Appendice B — Codici NUTS-3 e nomi delle province
+
+| Codice NUTS | Provincia |
+|---|---|
+| ITC4 | Lombardia (regione, NUTS-2) |
+| ITC41 | Varese |
+| ITC42 | Como |
+| ITC43 | Lecco |
+| ITC44 | Sondrio |
+| ITC46 | Bergamo |
+| ITC47 | Brescia |
+| ITC48 | Pavia |
+| ITC49 | Lodi |
+| ITC4A | Cremona |
+| ITC4B | Mantova |
+| ITC4C | Milano |
+| ITC4D | Monza e della Brianza |
+
+Nota: il codice `ITC45` non è presente nella classificazione NUTS
+attuale (revisione 2021).
+
+## Appendice C — Glossario delle unità di misura
+
+| Codice | Etichetta italiana |
+|---|---|
+| EUR | Euro |
+| EUR2015 | Euro (prezzi 2015) |
+| EUR2020 | Euro (prezzi 2020) |
+| EUR_HAB | Euro per abitante |
+| EUR_HAB2015 | Euro per abitante (prezzi 2015) |
+| GROWRT | Tasso di crescita (‰) |
+| I15 | Indice concatenato (base 2015) |
+| I20 | Indice concatenato (base 2020) |
+| MIO_EUR | Milioni di euro |
+| MIO_EUR2015 | Milioni di euro (prezzi 2015) |
+| MIO_EUR2020 | Milioni di euro (prezzi 2020) |
+| MIO_PPS_EU27_2020 | Milioni di PPS (EU27 2020) |
+| NR | Numero |
+| PC | Percentuale |
+| PCH_PRE | Variazione percentuale sull'anno precedente |
+| PPS_EU27_2020 | PPS (EU27 2020) |
+| PPS_HAB | PPS per abitante |
+| THS | Migliaia |
+| THS_HW | Migliaia di ore lavorate |
+
+## Appendice D — Riferimenti
+
+- Repository progetto: `github.com/gmontaletti/Ardeco` (privato).
+- Pacchetto ARDECO su CRAN: `https://cran.r-project.org/package=ARDECO`.
+- Joint Research Centre ARDECO:
+  `https://urban.jrc.ec.europa.eu/ardeco`.
+- Classificazione NUTS Eurostat:
+  `https://ec.europa.eu/eurostat/web/nuts`.
+- Palette CVD-safe Paul Tol:
+  `https://personal.sron.nl/~pault/`.
+- Palette Okabe-Ito:
+  `https://jfly.uni-koeln.de/color/`.

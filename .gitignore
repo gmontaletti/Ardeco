@@ -23,3 +23,8 @@ output/
 # OS
 .DS_Store
 .Renviron
+
+# Environment files
+.env
+.env.*
+!.env.example

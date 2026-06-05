@@ -1,5 +1,10 @@
 # Findings
 
+> **ARCHIVIATO — 2026-06-05.** Fotografia della struttura dati **pre-refactor**
+> (6 parquet tematici, Session 1 del 2026-04-01). Superato dall'architettura
+> DuckDB → PostgreSQL/Excel. Per le variabili correnti vedere
+> `docs/dashboard_variabili.md`. Conservato come riferimento storico.
+
 ## Current Data Structure
 - 6 thematic parquet files, each containing multiple ARDECO variables (combined with `var_code` column)
 - Columns: VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, var_code, plus optional SEX, AGE, SECTOR

@@ -128,6 +128,35 @@ output$vb_year <- renderValueBox({
   valueBox(YEAR_REF, caption = "Anno di riferimento (similarità)", icon = "fa-calendar", color = "success")
 })
 
+# Profilo strutturale: valori delle aree selezionate, celle colorate per
+# scostamento (in deviazioni standard) dalla regione di riferimento.
+output$feat_table <- DT::renderDT({
+  ft <- build_feature_table(sel$ref, sel$regions, GEO_EU)
+  req(!is.null(ft))
+  z_idx <- which(names(ft$df) %in% ft$z_cols) - 1L  # 0-based per DataTables
+  dtable <- DT::datatable(
+    ft$df,
+    rownames = FALSE,
+    options = list(
+      dom = "t",
+      paging = FALSE,
+      ordering = FALSE,
+      scrollX = TRUE,
+      scrollY = "300px",
+      columnDefs = list(list(visible = FALSE, targets = z_idx))
+    ),
+    caption = htmltools::tags$caption(
+      style = "caption-side: top; text-align: left; font-size: 90%;",
+      "Lo sfondo segnala lo scostamento dalla regione di riferimento: ",
+      htmltools::tags$span(style = "color:#0072B2;font-weight:bold;", "blu"),
+      " = inferiore, ",
+      htmltools::tags$span(style = "color:#D55E00;font-weight:bold;", "arancio"),
+      " = superiore (intensità in deviazioni standard)."
+    )
+  )
+  style_feature_table(dtable, ft$value_cols, ft$z_cols)
+})
+
 # 4. Output pagina 2: confronto mercato del lavoro -----
 
 lab_dt <- reactive({
@@ -297,7 +326,7 @@ valueBoxOutput("vb_nsel")
 valueBoxOutput("vb_year")
 ```
 
-## Row {data-height=880}
+## Row {data-height=560}
 
 ### Mappa delle regioni {data-width=520}
 
@@ -309,6 +338,14 @@ leaflet::leafletOutput("sel_map")
 
 ```{r}
 DT::DTOutput("rank_table")
+```
+
+## Row {data-height=360}
+
+### Profilo strutturale delle aree selezionate
+
+```{r}
+DT::DTOutput("feat_table")
 ```
 
 

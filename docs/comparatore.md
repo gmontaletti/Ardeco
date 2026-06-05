@@ -84,7 +84,12 @@ Due pagine (flexdashboard + Shiny):
 1. **Selezione aree** — scelta della regione di riferimento, suggerimento
    automatico delle 4 più simili (modificabile a mano o cliccando sulla mappa),
    mappa coropletica europea e classifica di similarità con le feature
-   che più contribuiscono alla distanza.
+   che più contribuiscono alla distanza. In fondo, una tabella «Profilo
+   strutturale» riporta i valori delle aree selezionate per ogni variabile di
+   similarità; lo sfondo di ciascuna cella ne segnala lo scostamento dalla
+   regione di riferimento (blu = inferiore, arancio = superiore; intensità in
+   deviazioni standard), così da evidenziare a colpo d'occhio le caratteristiche
+   su cui le aree differiscono di più.
 2. **Confronto mercato del lavoro** — per le aree selezionate, andamento storico
    di un indicatore comparabile (regione di riferimento evidenziata), confronto a
    barre dell'ultimo anno e tabella esportabile.

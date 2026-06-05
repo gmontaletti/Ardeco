@@ -368,3 +368,122 @@ bar_eu_latest <- function(dt, ind_label, unit_label, ref, geo) {
       yaxis = list(title = "")
     )
 }
+
+# 8. Profilo strutturale delle aree (pagina 1) -----
+
+# Ordine tematico delle feature: composizione VA settoriale, demografia,
+# taglia/densità/capitale. Coerente con feature_cols di 04_build_profiles.R.
+.feature_order <- c(
+  "clr_A",
+  "clr_BE",
+  "clr_F",
+  "clr_GJ",
+  "clr_K",
+  "clr_L",
+  "clr_MN",
+  "clr_OQ",
+  "clr_RU",
+  "dep_ratio",
+  "net_migr",
+  "pop_change",
+  "share_1564",
+  "log_pop",
+  "log_density",
+  "log_invest_pc"
+)
+
+# Palette diverging CVD-safe per lo scostamento standardizzato rispetto al
+# riferimento: blu = inferiore, neutro = simile, arancio = superiore.
+.zgap_breaks <- c(-2, -1, -0.4, 0.4, 1, 2)
+.zgap_bg <- c(
+  "#0072B2",
+  "#6BAED6",
+  "#D6E6F0",
+  "#FFFFFF",
+  "#FBE3C2",
+  "#E69F00",
+  "#D55E00"
+)
+.zgap_txt_breaks <- c(-2, 2)
+.zgap_txt <- c("#FFFFFF", "#222222", "#FFFFFF")
+
+#' Costruisce la tabella di confronto strutturale per la pagina di selezione.
+#'
+#' Una riga per feature (etichetta italiana), una colonna di valori grezzi per
+#' ciascuna area (riferimento + selezionate) e, affiancata, una colonna nascosta
+#' con lo scostamento standardizzato (z) rispetto al riferimento — la stessa
+#' quantità che determina la distanza di similarità — usata per colorare le celle.
+#'
+#' @return list(df, value_cols, z_cols, ref_col) oppure NULL se non ci sono dati.
+build_feature_table <- function(ref, regions, geo) {
+  con <- get_eu_con()
+  codes <- unique(c(ref, regions))
+  ph <- paste(rep("?", length(codes)), collapse = ", ")
+  q <- sprintf(
+    "SELECT l.NUTSCODE, l.FEATURE, l.value_raw, l.value_z, f.label_it
+     FROM region_features_long l
+     LEFT JOIN feature_labels f ON l.FEATURE = f.FEATURE
+     WHERE l.NUTSCODE IN (%s)",
+    ph
+  )
+  d <- as.data.table(DBI::dbGetQuery(con, q, params = as.list(codes)))
+  if (nrow(d) == 0L) {
+    return(NULL)
+  }
+
+  # Scostamento z rispetto al riferimento (= gap usato nella distanza)
+  ref_z <- d[NUTSCODE == ref, list(FEATURE, ref_z = value_z)]
+  d <- merge(d, ref_z, by = "FEATURE", all.x = TRUE)
+  d[, zgap := value_z - ref_z]
+
+  # Ordine tematico delle feature
+  d[, ord := match(FEATURE, .feature_order)]
+  d[is.na(ord), ord := 999L]
+  feats <- unique(d[order(ord)][, list(FEATURE, label_it)])
+
+  # Etichetta colonna = nome regione (codice NUTS come fallback)
+  name_lookup <- setNames(geo$NAME_LATN, geo$NUTS_ID)
+  col_label <- function(code) {
+    nm <- name_lookup[code]
+    lbl <- if (is.na(nm)) code else unname(nm)
+    if (code == ref) paste0(lbl, " (rif.)") else lbl
+  }
+
+  out <- data.frame(Indicatore = feats$label_it, stringsAsFactors = FALSE)
+  value_cols <- character(0)
+  z_cols <- character(0)
+  for (code in codes) {
+    sub <- d[NUTSCODE == code]
+    idx <- match(feats$FEATURE, sub$FEATURE)
+    vname <- col_label(code)
+    if (vname %in% names(out)) {
+      vname <- paste0(vname, " ", code)
+    }
+    zname <- paste0(vname, "__z")
+    out[[vname]] <- round(sub$value_raw[idx], 2)
+    out[[zname]] <- sub$zgap[idx]
+    value_cols <- c(value_cols, vname)
+    z_cols <- c(z_cols, zname)
+  }
+
+  list(
+    df = out,
+    value_cols = value_cols,
+    z_cols = z_cols,
+    ref_col = col_label(ref)
+  )
+}
+
+#' Applica la colorazione condizionale (sfondo per scostamento z) alla tabella.
+style_feature_table <- function(dtable, value_cols, z_cols) {
+  for (i in seq_along(value_cols)) {
+    dtable <- DT::formatStyle(
+      dtable,
+      columns = value_cols[i],
+      valueColumns = z_cols[i],
+      backgroundColor = DT::styleInterval(.zgap_breaks, .zgap_bg),
+      color = DT::styleInterval(.zgap_txt_breaks, .zgap_txt)
+    )
+  }
+  dtable
+}

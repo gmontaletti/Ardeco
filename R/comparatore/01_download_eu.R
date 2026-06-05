@@ -123,42 +123,47 @@ dbWriteTable(con, "download_log", summary_log, overwrite = TRUE)
 
 # 6. Copertura per paese -----
 
+# Conteggio regioni NUTS2 distinte per (variabile, paese), in forma long: con
+# molti paesi una tabella wide a colonne fisse non è praticabile.
 coverage <- as.data.table(dbGetQuery(
   con,
   "
   SELECT VARIABLE,
-         SUM(CASE WHEN NUTSCODE LIKE 'IT%' THEN 1 ELSE 0 END) AS n_IT,
-         SUM(CASE WHEN NUTSCODE LIKE 'DE%' THEN 1 ELSE 0 END) AS n_DE,
-         SUM(CASE WHEN NUTSCODE LIKE 'FR%' THEN 1 ELSE 0 END) AS n_FR,
-         SUM(CASE WHEN NUTSCODE LIKE 'PL%' THEN 1 ELSE 0 END) AS n_PL,
-         SUM(CASE WHEN NUTSCODE LIKE 'ES%' THEN 1 ELSE 0 END) AS n_ES
+         substr(NUTSCODE, 1, 2) AS CNTR_CODE,
+         COUNT(DISTINCT NUTSCODE) AS n_regioni
   FROM ardeco_data
-  GROUP BY VARIABLE
-  ORDER BY VARIABLE
+  WHERE LEVEL = 2
+  GROUP BY VARIABLE, substr(NUTSCODE, 1, 2)
+  ORDER BY VARIABLE, CNTR_CODE
 "
 ))
 dbWriteTable(con, "eu_coverage", coverage, overwrite = TRUE)
 
 # 7. Anni di riferimento (esclude previsioni) -----
 
-#' Ultimo anno (<= cutoff) con copertura su tutti i paesi per un set di variabili.
+#' Ultimo anno (<= cutoff) con copertura adeguata per un set di variabili.
 #'
-#' Per ciascuna variabile individua gli anni in cui sono presenti dati di
-#' livello 2 per tutti i paesi, poi interseca tra variabili e prende il massimo.
-latest_common_year <- function(con, vars, cutoff, n_countries) {
+#' Con paesi a copertura disomogenea non si può richiedere la presenza di TUTTI
+#' i paesi. Per ciascuna variabile si prende l'anno in cui il numero di regioni
+#' con dati è almeno `min_frac` del massimo storico della variabile; poi si
+#' interseca tra variabili e si prende il massimo.
+latest_year_covered <- function(con, vars, cutoff, min_frac = 0.8) {
   qualifying <- NULL
   for (v in vars) {
     yrs <- as.data.table(dbGetQuery(
       con,
       "
-      SELECT YEAR, COUNT(DISTINCT substr(NUTSCODE, 1, 2)) AS nc
+      SELECT YEAR, COUNT(DISTINCT NUTSCODE) AS nr
       FROM ardeco_data
       WHERE VARIABLE = ? AND LEVEL = 2 AND YEAR <= ?
       GROUP BY YEAR
       ",
       params = list(v, cutoff)
     ))
-    yrs_ok <- yrs[nc >= n_countries, YEAR]
+    if (nrow(yrs) == 0L) {
+      next
+    }
+    yrs_ok <- yrs[nr >= min_frac * max(nr), YEAR]
     if (length(yrs_ok) == 0L) {
       next
     }
@@ -177,18 +182,8 @@ latest_common_year <- function(con, vars, cutoff, n_countries) {
 sim_vars <- c("SUVGZ", "SPPAN", "SNPTD", "RUIGT", "SNMTNP", "SNPCNP", "SNPTN")
 lab_vars <- c("RPECNP", "RPUCNP", "SOVGDE", "SOVGDP", "SNETD", "SNWTD", "RNLHT")
 
-year_ref <- latest_common_year(
-  con,
-  sim_vars,
-  EU_OBS_CUTOFF,
-  length(EU_COUNTRIES)
-)
-year_latest_obs <- latest_common_year(
-  con,
-  lab_vars,
-  EU_OBS_CUTOFF,
-  length(EU_COUNTRIES)
-)
+year_ref <- latest_year_covered(con, sim_vars, EU_OBS_CUTOFF)
+year_latest_obs <- latest_year_covered(con, lab_vars, EU_OBS_CUTOFF)
 
 # nota: 'key' è un argomento riservato di data.table(); si crea con un nome
 # temporaneo e si rinomina in 'key' (colonna letta dal dashboard).
@@ -217,7 +212,11 @@ if (n_failed > 0L) {
   )
 }
 
-print(coverage)
+# Sintesi copertura: numero massimo di regioni NUTS2 per paese
+cov_summary <- coverage[, list(max_regioni = max(n_regioni)), by = CNTR_CODE]
+setorder(cov_summary, -max_regioni)
+message("\nRegioni NUTS2 per paese (max tra le variabili):")
+print(cov_summary)
 
 row_count <- dbGetQuery(con, "SELECT COUNT(*) AS n FROM ardeco_data")$n
 var_count <- dbGetQuery(

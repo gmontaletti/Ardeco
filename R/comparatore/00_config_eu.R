@@ -24,8 +24,50 @@ library(R.utils)
 EU_DB_PATH <- "data/ardeco_eu.duckdb"
 EU_GEO_PATH <- "data/eu_nuts2.gpkg"
 EU_PCA_PATH <- "data/eu_pca_model.rds"
-EU_COUNTRIES <- c("IT", "DE", "FR", "PL", "ES")
-EU_NUTSCODE <- paste(EU_COUNTRIES, collapse = ",") # "IT,DE,FR,PL,ES"
+# Tutti i paesi coperti da ARDECO: UE27 + EFTA (CH, IS, LI, NO) +
+# candidati/Balcani occidentali (AL, ME, MK, RS, TR). 'EL' = Grecia (codifica
+# Eurostat). La copertura per regione varia: micro-stati (CY, LU, MT, LI, EE,
+# IS) sono un'unica regione NUTS2; i paesi candidati hanno serie di contabilità
+# nazionale più sparse.
+EU_COUNTRIES <- c(
+  "AL",
+  "AT",
+  "BE",
+  "BG",
+  "CH",
+  "CY",
+  "CZ",
+  "DE",
+  "DK",
+  "EE",
+  "EL",
+  "ES",
+  "FI",
+  "FR",
+  "HR",
+  "HU",
+  "IE",
+  "IS",
+  "IT",
+  "LI",
+  "LT",
+  "LU",
+  "LV",
+  "ME",
+  "MK",
+  "MT",
+  "NL",
+  "NO",
+  "PL",
+  "PT",
+  "RO",
+  "RS",
+  "SE",
+  "SI",
+  "SK",
+  "TR"
+)
+EU_NUTSCODE <- paste(EU_COUNTRIES, collapse = ",")
 EU_LEVEL <- "0,2" # 2 = regioni NUTS2; 0 = aggregati paese (linee di contesto)
 EU_VERSION <- 2024
 REF_DEFAULT <- "ITC4" # Lombardia

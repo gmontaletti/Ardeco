@@ -256,8 +256,10 @@ if (!is.null(invest)) {
 
 # 8. Assemblaggio matrice feature -----
 
+# Ancorato alle regioni con geometria (all.x = TRUE su areas): le regioni ARDECO
+# prive di geometria GISCO non sono mappabili né selezionabili e restano escluse.
 feat <- Reduce(
-  function(x, y) merge(x, y, by = "NUTSCODE", all = TRUE),
+  function(x, y) merge(x, y, by = "NUTSCODE", all.x = TRUE),
   Filter(
     Negate(is.null),
     list(

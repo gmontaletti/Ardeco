@@ -1,7 +1,8 @@
 # ==============================================================================
 # 02_download_geo_eu.R
-# Scarica i confini regionali NUTS2 di IT, DE, FR, PL, ES tramite giscoR.
-# Calcola l'area (km^2) di ciascuna regione, usata come densità nella similarità.
+# Scarica i confini regionali NUTS2 dei paesi europei coperti da ARDECO tramite
+# giscoR. Calcola l'area (km^2) di ciascuna regione, usata come densità nella
+# similarità.
 # Output: data/eu_nuts2.gpkg
 # Uso: Rscript R/comparatore/02_download_geo_eu.R
 # ==============================================================================
@@ -14,12 +15,22 @@ source("R/comparatore/00_config_eu.R")
 
 # 2. Download NUTS2 -----
 
-nuts2 <- giscoR::gisco_get_nuts(
+# Si scarica l'intero set NUTS2 e si filtra per CNTR_CODE: alcuni paesi
+# candidati possono non essere presenti nel dataset GISCO e vengono segnalati.
+nuts2_all <- giscoR::gisco_get_nuts(
   year = "2021",
   resolution = "10",
-  nuts_level = "2",
-  country = EU_COUNTRIES
+  nuts_level = "2"
 )
+nuts2 <- nuts2_all[nuts2_all$CNTR_CODE %in% EU_COUNTRIES, ]
+
+missing_geo <- setdiff(EU_COUNTRIES, unique(nuts2$CNTR_CODE))
+if (length(missing_geo) > 0L) {
+  message(
+    "Paesi senza geometria NUTS2 in GISCO (esclusi dal comparatore): ",
+    paste(missing_geo, collapse = ", ")
+  )
+}
 
 # 3. Pulizia colonne (subsetting base, no dplyr) -----
 

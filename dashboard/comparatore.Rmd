@@ -1,5 +1,5 @@
 ---
-title: "ARDECO — Comparatore regionale (IT/DE/FR/PL/ES)"
+title: "ARDECO — Comparatore regionale europeo"
 output:
   flexdashboard::flex_dashboard:
     orientation: rows

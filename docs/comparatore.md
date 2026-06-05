@@ -1,8 +1,15 @@
-# Comparatore regionale cross-country (IT / DE / FR / PL / ES)
+# Comparatore regionale europeo
 
-Esercizio di confronto tra le regioni NUTS2 di Italia, Germania, Francia, Polonia
-e Spagna. Individua le regioni strutturalmente più simili a una di riferimento
-(default Lombardia, `ITC4`) e ne confronta gli andamenti del mercato del lavoro.
+Esercizio di confronto tra le regioni NUTS2 dei paesi europei coperti da ARDECO
+(UE27 + EFTA + candidati/Balcani occidentali; la lista è in
+`R/comparatore/00_config_eu.R`, variabile `EU_COUNTRIES`). Individua le regioni
+strutturalmente più simili a una di riferimento (default Lombardia, `ITC4`) e ne
+confronta gli andamenti del mercato del lavoro.
+
+La copertura per regione è disomogenea: i micro-stati (CY, LU, MT, LI, EE, IS)
+sono un'unica regione NUTS2; i paesi candidati hanno serie di contabilità
+nazionale più sparse. Il calcolo della similarità scarta automaticamente le
+regioni con troppi valori mancanti e quelle prive di geometria GISCO.
 
 Gli artefatti sono **paralleli** alla pipeline di produzione Lombardia e non la
 modificano: database `data/ardeco_eu.duckdb`, geometrie `data/eu_nuts2.gpkg`,
@@ -76,7 +83,7 @@ Due pagine (flexdashboard + Shiny):
 
 1. **Selezione aree** — scelta della regione di riferimento, suggerimento
    automatico delle 4 più simili (modificabile a mano o cliccando sulla mappa),
-   mappa coropletica dei cinque paesi e classifica di similarità con le feature
+   mappa coropletica europea e classifica di similarità con le feature
    che più contribuiscono alla distanza.
 2. **Confronto mercato del lavoro** — per le aree selezionate, andamento storico
    di un indicatore comparabile (regione di riferimento evidenziata), confronto a

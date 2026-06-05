@@ -50,7 +50,7 @@ close_eu_con <- function() {
 
 # 3. Caricamento dati -----
 
-#' Legge la geometria NUTS2 dei cinque paesi.
+#' Legge la geometria NUTS2 dei paesi europei coperti.
 load_eu_geo <- function() {
   path <- file.path("..", "data", "eu_nuts2.gpkg")
   if (!file.exists(path)) {
@@ -150,7 +150,7 @@ bbox_for <- function(geo, nutscodes) {
 
 # 5. Mappa di selezione -----
 
-#' Mappa NUTS2 dei cinque paesi con evidenziazione di riferimento e selezione.
+#' Mappa NUTS2 europea con evidenziazione di riferimento e selezione.
 #'
 #' I poligoni hanno layerId = NUTS_ID, così il click restituisce il codice
 #' regione e il dashboard può aggiungere/togliere la regione dalla selezione.

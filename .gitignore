@@ -3,6 +3,9 @@ data/*.gpkg
 data/*.duckdb
 data/*.duckdb.wal
 
+# Comparatore precomputed model
+data/eu_pca_model.rds
+
 # Archived artifacts
 reference/archive/
 

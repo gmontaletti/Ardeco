@@ -1,0 +1,83 @@
+# Comparatore regionale cross-country (IT / DE / FR / PL / ES)
+
+Esercizio di confronto tra le regioni NUTS2 di Italia, Germania, Francia, Polonia
+e Spagna. Individua le regioni strutturalmente più simili a una di riferimento
+(default Lombardia, `ITC4`) e ne confronta gli andamenti del mercato del lavoro.
+
+Gli artefatti sono **paralleli** alla pipeline di produzione Lombardia e non la
+modificano: database `data/ardeco_eu.duckdb`, geometrie `data/eu_nuts2.gpkg`,
+modello `data/eu_pca_model.rds`, dashboard `dashboard/comparatore.Rmd` (tutti
+esclusi dal versionamento).
+
+## Pipeline
+
+Eseguire in ordine dalla radice del progetto:
+
+```
+Rscript R/comparatore/99_smoke_test_eu.R   # verifica API multi-paese (opzionale)
+Rscript R/comparatore/01_download_eu.R     # 57 variabili x livelli 0,2 -> ardeco_eu.duckdb
+Rscript R/comparatore/02_download_geo_eu.R # geometrie NUTS2 -> eu_nuts2.gpkg
+Rscript R/comparatore/03_labour_indicators.R # indicatori comparabili del lavoro
+Rscript R/comparatore/04_build_profiles.R    # similarità: feature, PCA, distanze, cluster
+```
+
+Dashboard (dalla cartella `dashboard/`):
+
+```
+R -e 'rmarkdown::run("comparatore.Rmd")'
+```
+
+`00_config_eu.R` è la configurazione condivisa (paesi, percorsi, gruppi tematici,
+etichette, `download_variable()`); i blocchi di definizione sono copiati da
+`R/01_build_duckdb.R` per non accoppiarsi al codice di produzione.
+
+## Principio metodologico: insiemi disgiunti
+
+Le variabili che determinano la **similarità** sono disgiunte da quelle usate per
+il **confronto** del mercato del lavoro, per evitare circolarità (selezionare
+regioni simili su un esito e poi "scoprire" che condividono quell'esito).
+`04_build_profiles.R` verifica a runtime che l'intersezione sia vuota.
+
+## Indicatori del lavoro confrontati (solo rapporti / serie comparabili)
+
+Per i confronti di livello tra paesi si usano valori in **PPS** (la Polonia non è
+nell'area euro) o **reali** (prezzi 2015) per i trend; tassi e quote in punti
+percentuali. Mai livelli assoluti.
+
+| Indicatore | Fonte / formula | Unità |
+|---|---|---|
+| Tasso di occupazione (20-64) | RPECNP | % |
+| Tasso di disoccupazione (15-74) | RPUCNP | % |
+| Produttività per occupato (reale) | SOVGDE | euro 2015/occupato |
+| Produttività per ora (reale) | SOVGDH | euro 2015/ora |
+| Produttività per occupato (PPS) | SUVGD(PPS) / SNETD | PPS/occupato |
+| PIL pro capite (PPS) | SUVGDP | PPS/abitante |
+| PIL pro capite (reale) | SOVGDP | euro 2015/abitante |
+| Compenso reale per ora | ROWCDH | euro 2015/ora |
+| Quota dipendenti su occupati | SNWTD / SNETD | % |
+| Ore lavorate per occupato | RNLHT / SNETD | ore/anno |
+
+## Variabili strutturali per la similarità (benchmark)
+
+Composizione settoriale del valore aggiunto (`SUVGZ`, trasformazione clr),
+demografia (`SPPAN` dipendenza, `SNMTNP` migrazione netta, `SNPCNP` variazione,
+quota 15-64 da `SNPTN`), taglia e densità (`SNPTD`, area dal gpkg) e intensità di
+formazione del capitale (`RUIGT` pro capite). Circa 16 feature.
+
+Metodo: standardizzazione z-score → PCA (componenti fino al 90% della varianza) →
+distanza euclidea nello spazio delle componenti principali (equivalente a una
+distanza di Mahalanobis denoised; pesatura empirica, nessun peso arbitrario). Le
+prime 4 regioni più vicine alla regione di riferimento sono il suggerimento
+automatico. Controllo di robustezza con clustering gerarchico e k-means.
+
+## Dashboard
+
+Due pagine (flexdashboard + Shiny):
+
+1. **Selezione aree** — scelta della regione di riferimento, suggerimento
+   automatico delle 4 più simili (modificabile a mano o cliccando sulla mappa),
+   mappa coropletica dei cinque paesi e classifica di similarità con le feature
+   che più contribuiscono alla distanza.
+2. **Confronto mercato del lavoro** — per le aree selezionate, andamento storico
+   di un indicatore comparabile (regione di riferimento evidenziata), confronto a
+   barre dell'ultimo anno e tabella esportabile.

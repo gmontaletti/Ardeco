@@ -1,0 +1,372 @@
+---
+title: "ARDECO — Comparatore regionale (IT/DE/FR/PL/ES)"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    theme: cosmo
+    navbar:
+      - { title: "GitHub", href: "https://github.com/gmontaletti", align: right }
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+source("R/helpers.R")
+source("R/helpers_eu.R")
+
+# 1. Caricamenti iniziali -----
+
+GEO_EU   <- load_eu_geo()
+REGIONS  <- load_region_names(GEO_EU)
+IND_META <- load_eu_indicator_labels()
+META     <- load_eu_meta()
+YEAR_REF <- as.integer(META$YEAR_REF)
+
+onSessionEnded(close_eu_con)
+
+# Scelte per i menu (regioni raggruppate per paese, indicatori per gruppo)
+reg_choices <- split(
+  setNames(REGIONS$NUTSCODE, REGIONS$NAME),
+  REGIONS$CNTR_CODE
+)
+ind_choices <- split(
+  setNames(IND_META$INDICATOR, IND_META$label_it),
+  IND_META$ind_group
+)
+
+region_name <- function(code) {
+  nm <- REGIONS[NUTSCODE == code, NAME]
+  if (length(nm) == 0L) code else nm[1]
+}
+
+# 2. Stato condiviso tra le pagine -----
+
+sel <- reactiveValues(ref = "ITC4", regions = NULL)
+
+top4_for <- function(ref) {
+  d <- load_distances(ref)
+  utils::head(d[NBR_NUTSCODE != ref][order(rank)]$NBR_NUTSCODE, 4)
+}
+
+observeEvent(input$ref_region, {
+  sel$ref <- input$ref_region
+  t4 <- top4_for(input$ref_region)
+  sel$regions <- t4
+  updateSelectizeInput(session, "sel_regions", selected = t4)
+})
+
+observeEvent(input$sel_regions, {
+  sel$regions <- setdiff(input$sel_regions, sel$ref)
+}, ignoreNULL = FALSE)
+
+observeEvent(input$reset_top4, {
+  t4 <- top4_for(sel$ref)
+  sel$regions <- t4
+  updateSelectizeInput(session, "sel_regions", selected = t4)
+})
+
+# Click sulla mappa: aggiunge/toglie la regione dalla selezione
+observeEvent(input$sel_map_shape_click, {
+  id <- input$sel_map_shape_click$id
+  if (is.null(id) || id == sel$ref) {
+    return()
+  }
+  cur <- sel$regions
+  new <- if (id %in% cur) setdiff(cur, id) else unique(c(cur, id))
+  sel$regions <- new
+  updateSelectizeInput(session, "sel_regions", selected = new)
+})
+
+regions_effective <- reactive({
+  unique(c(sel$ref, sel$regions))
+})
+
+# 3. Output pagina 1: mappa, classifica, value box -----
+
+output$sel_map <- renderLeaflet({
+  map_eu_selection(GEO_EU, sel$ref, sel$regions)
+})
+
+output$rank_table <- DT::renderDT({
+  d <- load_distances(sel$ref)
+  d <- d[NBR_NUTSCODE != sel$ref][order(rank)][seq_len(min(15L, .N))]
+  d <- merge(
+    d,
+    REGIONS[, list(NUTSCODE, NAME, CNTR_CODE)],
+    by.x = "NBR_NUTSCODE", by.y = "NUTSCODE"
+  )
+  setorder(d, rank)
+  d[, motivo := vapply(NBR_NUTSCODE, function(nbr) {
+    fc <- load_feature_contrib(sel$ref, nbr, 2L)
+    paste(fc$label_it, collapse = "; ")
+  }, character(1))]
+  d[, sel := ifelse(NBR_NUTSCODE %in% sel$regions, "✓", "")]
+  out <- d[, list(
+    Rango = rank,
+    Regione = NAME,
+    Paese = CNTR_CODE,
+    Distanza = round(distance, 2),
+    `Differenze principali` = motivo,
+    Sel. = sel
+  )]
+  DT::datatable(
+    as.data.frame(out),
+    rownames = FALSE,
+    options = list(dom = "tp", pageLength = 8, scrollX = TRUE),
+    caption = paste0("Regioni più simili a ", region_name(sel$ref))
+  )
+})
+
+output$vb_ref <- renderValueBox({
+  valueBox(region_name(sel$ref), caption = "Regione di riferimento", icon = "fa-location-dot", color = "primary")
+})
+output$vb_nsel <- renderValueBox({
+  valueBox(length(sel$regions), caption = "Aree confrontate", icon = "fa-layer-group", color = "info")
+})
+output$vb_year <- renderValueBox({
+  valueBox(YEAR_REF, caption = "Anno di riferimento (similarità)", icon = "fa-calendar", color = "success")
+})
+
+# 4. Output pagina 2: confronto mercato del lavoro -----
+
+lab_dt <- reactive({
+  req(input$lab_indicator)
+  load_labour_indicators(input$lab_indicator, regions_effective())
+})
+ind_label <- reactive({
+  IND_META[INDICATOR == input$lab_indicator, label_it]
+})
+unit_label <- reactive({
+  IND_META[INDICATOR == input$lab_indicator, unit_label]
+})
+ind_dir <- reactive({
+  as.integer(IND_META[INDICATOR == input$lab_indicator, direction])
+})
+
+output$sel_echo <- renderText({
+  paste0(
+    "Riferimento: ", region_name(sel$ref), ". ",
+    "Aree: ",
+    if (length(sel$regions) == 0L) {
+      "(nessuna)"
+    } else {
+      paste(vapply(sel$regions, region_name, character(1)), collapse = ", ")
+    },
+    ". Modificabili nella pagina «Selezione aree»."
+  )
+})
+
+output$lab_trend <- plotly::renderPlotly({
+  ts_plotly_compare(lab_dt(), ind_label(), unit_label(), sel$ref, GEO_EU)
+})
+
+output$lab_bar <- plotly::renderPlotly({
+  bar_eu_latest(lab_dt(), ind_label(), unit_label(), sel$ref, GEO_EU)
+})
+
+output$lab_table <- DT::renderDT({
+  d <- lab_dt()
+  req(nrow(d) > 0)
+  d[, region := vapply(NUTSCODE, region_name, character(1))]
+  w <- dcast(d, region ~ YEAR, value.var = "VALUE")
+  setorder(w, region)
+  year_cols <- setdiff(names(w), "region")
+  DT::datatable(
+    as.data.frame(w),
+    rownames = FALSE,
+    extensions = "Buttons",
+    options = list(
+      dom = "Bfrtip",
+      buttons = list("csv", "excel"),
+      scrollX = TRUE,
+      pageLength = 10
+    ),
+    caption = paste0(ind_label(), " (", unit_label(), ")")
+  ) |>
+    DT::formatRound(columns = year_cols, digits = 1)
+})
+
+output$lab_vb_ref <- renderValueBox({
+  d <- lab_dt()
+  rd <- d[NUTSCODE == sel$ref]
+  if (nrow(rd) == 0L) {
+    return(valueBox("—", caption = "Riferimento (n/d)", color = "primary"))
+  }
+  yr <- max(rd$YEAR)
+  valueBox(
+    round(rd[YEAR == yr, VALUE], 1),
+    caption = paste0(region_name(sel$ref), " (", yr, ")"),
+    icon = "fa-star", color = "primary"
+  )
+})
+
+output$lab_vb_best <- renderValueBox({
+  d <- lab_dt()
+  dir <- ind_dir()
+  req(nrow(d) > 0)
+  yr <- d[, list(n = uniqueN(NUTSCODE)), by = YEAR][n == max(n), max(YEAR)]
+  dy <- d[YEAR == yr]
+  if (nrow(dy) == 0L || dir == 0L) {
+    return(valueBox("—", caption = "Migliore (n/a)", color = "info"))
+  }
+  best <- if (dir > 0L) dy[which.max(VALUE)] else dy[which.min(VALUE)]
+  valueBox(
+    region_name(best$NUTSCODE),
+    caption = paste0("Migliore: ", round(best$VALUE, 1), " (", yr, ")"),
+    icon = "fa-arrow-up", color = "success"
+  )
+})
+
+output$lab_vb_worst <- renderValueBox({
+  d <- lab_dt()
+  dir <- ind_dir()
+  req(nrow(d) > 0)
+  yr <- d[, list(n = uniqueN(NUTSCODE)), by = YEAR][n == max(n), max(YEAR)]
+  dy <- d[YEAR == yr]
+  if (nrow(dy) == 0L || dir == 0L) {
+    return(valueBox("—", caption = "Peggiore (n/a)", color = "warning"))
+  }
+  worst <- if (dir > 0L) dy[which.min(VALUE)] else dy[which.max(VALUE)]
+  valueBox(
+    region_name(worst$NUTSCODE),
+    caption = paste0("Peggiore: ", round(worst$VALUE, 1), " (", yr, ")"),
+    icon = "fa-arrow-down", color = "warning"
+  )
+})
+
+# 5. Fix leaflet in tab nascoste -----
+
+shiny::insertUI(
+  selector = "head",
+  where = "beforeEnd",
+  ui = tags$script(HTML("
+    $(document).on('shown.bs.tab', function(e) {
+      setTimeout(function() {
+        $('.leaflet').each(function() {
+          var map = HTMLWidgets.find('#' + this.id);
+          if (map && map.invalidateSize) { map.invalidateSize(); }
+        });
+      }, 150);
+    });
+  "))
+)
+```
+
+# Selezione aree
+
+## {.sidebar data-width=330}
+
+```{r}
+selectInput(
+  "ref_region", "Regione di riferimento",
+  choices = reg_choices, selected = "ITC4"
+)
+
+helpText(
+  "Le 4 aree più simili sono suggerite automaticamente.",
+  "Clicca una regione sulla mappa o usa il menu per modificare la selezione."
+)
+
+selectizeInput(
+  "sel_regions", "Aree confrontate",
+  choices = reg_choices, multiple = TRUE,
+  options = list(maxItems = 6, plugins = list("remove_button"))
+)
+
+actionButton("reset_top4", "Ripristina top-4 suggerite", icon = icon("rotate"))
+```
+
+## Row {data-height=120}
+
+### Riferimento
+
+```{r}
+valueBoxOutput("vb_ref")
+```
+
+### Aree
+
+```{r}
+valueBoxOutput("vb_nsel")
+```
+
+### Anno
+
+```{r}
+valueBoxOutput("vb_year")
+```
+
+## Row {data-height=880}
+
+### Mappa delle regioni {data-width=520}
+
+```{r}
+leaflet::leafletOutput("sel_map")
+```
+
+### Classifica di similarità {data-width=480}
+
+```{r}
+DT::DTOutput("rank_table")
+```
+
+
+# Confronto mercato del lavoro
+
+## {.sidebar data-width=330}
+
+```{r}
+selectInput(
+  "lab_indicator", "Indicatore",
+  choices = ind_choices,
+  selected = "tasso_disoccupazione"
+)
+
+helpText("Solo indicatori comparabili (tassi, rapporti, valori in PPS o reali).")
+
+tags$hr()
+textOutput("sel_echo")
+```
+
+## Row {data-height=120}
+
+### Riferimento
+
+```{r}
+valueBoxOutput("lab_vb_ref")
+```
+
+### Migliore
+
+```{r}
+valueBoxOutput("lab_vb_best")
+```
+
+### Peggiore
+
+```{r}
+valueBoxOutput("lab_vb_worst")
+```
+
+## Row {data-height=560}
+
+### Andamento {data-width=600}
+
+```{r}
+plotly::plotlyOutput("lab_trend")
+```
+
+### Ultimo anno {data-width=400}
+
+```{r}
+plotly::plotlyOutput("lab_bar")
+```
+
+## Row {data-height=320}
+
+### Tabella comparativa
+
+```{r}
+DT::DTOutput("lab_table")
+```

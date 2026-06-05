@@ -22,8 +22,19 @@ REGIONS  <- load_region_names(GEO_EU)
 IND_META <- load_eu_indicator_labels()
 META     <- load_eu_meta()
 YEAR_REF <- as.integer(META$YEAR_REF)
+CLUSTERS <- load_clusters()
 
 onSessionEnded(close_eu_con)
+
+# Cluster (gruppo ward) e flag outlier di una regione
+ref_cluster_of <- function(code) {
+  v <- CLUSTERS[NUTSCODE == code, cluster]
+  if (length(v) == 0L) NA_integer_ else v[1]
+}
+ref_is_outlier <- function(code) {
+  v <- CLUSTERS[NUTSCODE == code, is_outlier]
+  length(v) == 1L && v == 1L
+}
 
 # Scelte per i menu (regioni raggruppate per paese, indicatori per gruppo)
 reg_choices <- split(
@@ -66,6 +77,36 @@ observeEvent(input$reset_top4, {
   updateSelectizeInput(session, "sel_regions", selected = t4)
 })
 
+# Seleziona le 6 regioni più vicine appartenenti allo stesso cluster ward del
+# riferimento (cluster ∩ vicinato, ordinate per distanza). Se nessun co-membro
+# è disponibile, ricade sulle 6 più simili in assoluto.
+observeEvent(input$select_cluster, {
+  rc <- ref_cluster_of(sel$ref)
+  nn <- load_distances(sel$ref)
+  nn <- nn[NBR_NUTSCODE != sel$ref][order(rank)]
+  picked <- character(0)
+  if (!is.na(rc)) {
+    co <- CLUSTERS[cluster == rc & NUTSCODE != sel$ref, NUTSCODE]
+    picked <- utils::head(nn[NBR_NUTSCODE %in% co]$NBR_NUTSCODE, 6L)
+  }
+  if (length(picked) == 0L) {
+    picked <- utils::head(nn$NBR_NUTSCODE, 6L)
+    showNotification(
+      "Nessun co-membro di cluster disponibile: selezionate le 6 aree più simili.",
+      type = "warning",
+      duration = 5
+    )
+  } else if (ref_is_outlier(sel$ref)) {
+    showNotification(
+      "Riferimento con struttura atipica: appartenenza al cluster debole.",
+      type = "message",
+      duration = 5
+    )
+  }
+  sel$regions <- picked
+  updateSelectizeInput(session, "sel_regions", selected = picked)
+})
+
 # Click sulla mappa: aggiunge/toglie la regione dalla selezione
 observeEvent(input$sel_map_shape_click, {
   id <- input$sel_map_shape_click$id
@@ -85,7 +126,20 @@ regions_effective <- reactive({
 # 3. Output pagina 1: mappa, classifica, value box -----
 
 output$sel_map <- renderLeaflet({
-  map_eu_selection(GEO_EU, sel$ref, sel$regions)
+  if (identical(input$map_mode, "cluster")) {
+    map_eu_clusters(GEO_EU, CLUSTERS, sel$ref, sel$regions)
+  } else {
+    map_eu_selection(GEO_EU, sel$ref, sel$regions)
+  }
+})
+
+# Etichetta dinamica del pulsante "seleziona cluster"
+output$select_cluster_label <- renderUI({
+  actionButton(
+    "select_cluster",
+    paste0("Seleziona aree del cluster di ", region_name(sel$ref)),
+    icon = icon("circle-nodes")
+  )
 })
 
 output$rank_table <- DT::renderDT({
@@ -126,6 +180,34 @@ output$vb_nsel <- renderValueBox({
 })
 output$vb_year <- renderValueBox({
   valueBox(YEAR_REF, caption = "Anno di riferimento (similarità)", icon = "fa-calendar", color = "success")
+})
+
+output$vb_cluster <- renderValueBox({
+  rc <- ref_cluster_of(sel$ref)
+  if (is.na(rc)) {
+    return(valueBox(
+      "n/d",
+      caption = "Cluster del riferimento",
+      icon = "fa-circle-nodes",
+      color = "warning"
+    ))
+  }
+  size <- CLUSTERS[cluster == rc, .N]
+  if (ref_is_outlier(sel$ref)) {
+    valueBox(
+      paste0("Cluster ", rc),
+      caption = paste0("Struttura atipica (", size, " regioni nel cluster)"),
+      icon = "fa-circle-nodes",
+      color = "#E69F00"
+    )
+  } else {
+    valueBox(
+      paste0("Cluster ", rc),
+      caption = paste0(size, " regioni nel tipo strutturale"),
+      icon = "fa-circle-nodes",
+      color = "#5E35B1"
+    )
+  }
 })
 
 # Profilo strutturale: valori delle aree selezionate, celle colorate per
@@ -304,6 +386,21 @@ selectizeInput(
 )
 
 actionButton("reset_top4", "Ripristina top-4 suggerite", icon = icon("rotate"))
+
+tags$hr()
+
+radioButtons(
+  "map_mode", "Colore mappa",
+  choices = c("Ruoli" = "roles", "Cluster" = "cluster"),
+  selected = "roles", inline = TRUE
+)
+
+helpText(
+  "In «Cluster» la mappa colora le regioni per tipo strutturale (gruppi ward);",
+  "le aree atipiche (outlier) sono in grigio."
+)
+
+uiOutput("select_cluster_label")
 ```
 
 ## Row {data-height=120}
@@ -324,6 +421,12 @@ valueBoxOutput("vb_nsel")
 
 ```{r}
 valueBoxOutput("vb_year")
+```
+
+### Cluster
+
+```{r}
+valueBoxOutput("vb_cluster")
 ```
 
 ## Row {data-height=560}

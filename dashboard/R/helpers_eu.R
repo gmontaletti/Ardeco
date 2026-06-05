@@ -487,3 +487,135 @@ style_feature_table <- function(dtable, value_cols, z_cols) {
   }
   dtable
 }
+
+# 9. Cluster: gruppi ward + flag outlier (strumento di selezione) -----
+
+# Grigio per le regioni segnalate come strutturalmente atipiche (outlier),
+# distinto dal grigio "Altra" (#E8E8E8) della vista per ruoli.
+.cluster_outlier_color <- "#9E9E9E"
+
+#' Legge le assegnazioni di cluster (gruppi ward + punteggio di atipicità GLOSH).
+load_clusters <- function() {
+  con <- get_eu_con()
+  as.data.table(DBI::dbReadTable(con, "cluster_assignments"))
+}
+
+#' Mappa stabile id-cluster -> colore CVD-safe (ricicla la palette se necessario).
+cluster_color_map <- function(cluster_ids) {
+  ids <- sort(unique(cluster_ids))
+  cols <- .cvd_palette[(seq_along(ids) - 1L) %% length(.cvd_palette) + 1L]
+  setNames(cols, as.character(ids))
+}
+
+#' Mappa NUTS2 colorata per cluster ward; gli outlier in grigio.
+#'
+#' Il riempimento codifica il tipo di regione (cluster ward); le regioni
+#' segnalate come atipiche (is_outlier) sono in grigio. Il ruolo (riferimento /
+#' selezionata) è codificato dal bordo, così resta leggibile sopra il colore di
+#' cluster. layerId = NUTS_ID mantiene attivo il click-per-selezione.
+map_eu_clusters <- function(geo, clusters, ref, selected) {
+  selected <- setdiff(selected, ref)
+  cl_lookup <- setNames(clusters$cluster, clusters$NUTSCODE)
+  out_lookup <- setNames(clusters$is_outlier, clusters$NUTSCODE)
+  os_lookup <- setNames(clusters$outlier_score, clusters$NUTSCODE)
+
+  # unname(): i lookup indicizzati per NUTS_ID restituiscono vettori con nomi;
+  # un vettore con nomi viene serializzato come oggetto JSON (non array) e
+  # leaflet non riesce ad applicare i colori per poligono (mappa grigia).
+  reg_cluster <- unname(cl_lookup[geo$NUTS_ID])
+  reg_outlier <- unname(out_lookup[geo$NUTS_ID])
+  cmap <- cluster_color_map(clusters$cluster)
+
+  fill <- unname(ifelse(
+    is.na(reg_cluster),
+    "#E8E8E8",
+    ifelse(
+      reg_outlier == 1L,
+      .cluster_outlier_color,
+      cmap[as.character(reg_cluster)]
+    )
+  ))
+
+  role <- ifelse(
+    geo$NUTS_ID == ref,
+    "Riferimento",
+    ifelse(geo$NUTS_ID %in% selected, "Selezionata", "Altra")
+  )
+  bweight <- ifelse(
+    role == "Riferimento",
+    3,
+    ifelse(role == "Selezionata", 2, 0.5)
+  )
+  bcolor <- ifelse(role == "Altra", "#777777", "#000000")
+
+  cluster_label <- ifelse(
+    is.na(reg_cluster),
+    "Cluster: n/d",
+    ifelse(
+      reg_outlier == 1L,
+      paste0(
+        "<em>Struttura atipica</em> (score ",
+        round(os_lookup[geo$NUTS_ID], 2),
+        ")"
+      ),
+      paste0("Cluster ", reg_cluster)
+    )
+  )
+  popup <- paste0(
+    "<strong>",
+    geo$NAME_LATN,
+    "</strong><br>",
+    geo$NUTS_ID,
+    " (",
+    geo$CNTR_CODE,
+    ")<br>",
+    cluster_label
+  )
+
+  # Vista predefinita: Europa continentale, per mostrare l'intera mappa dei tipi
+  # di regione. Esclude i territori d'oltremare (Mayotte, Guyana, ecc.), che
+  # sono comunque outlier mostrati in grigio e dilaterebbero i confini.
+  b <- list(lng1 = -25, lat1 = 34, lng2 = 45, lat2 = 71)
+  js_fit <- sprintf(
+    "function(el, x) {
+      var m = this;
+      setTimeout(function() {
+        m.invalidateSize();
+        m.fitBounds([[%f, %f], [%f, %f]], {padding: [20, 20]});
+      }, 250);
+    }",
+    b$lat1,
+    b$lng1,
+    b$lat2,
+    b$lng2
+  )
+
+  present <- sort(unique(clusters$cluster))
+  leg_colors <- c(cmap[as.character(present)], .cluster_outlier_color)
+  leg_labels <- c(paste("Cluster", present), "Atipica (outlier)")
+
+  leaflet::leaflet(geo) |>
+    leaflet::addProviderTiles(leaflet::providers$CartoDB.Positron) |>
+    leaflet::addPolygons(
+      layerId = ~NUTS_ID,
+      fillColor = fill,
+      fillOpacity = 0.75,
+      weight = bweight,
+      color = bcolor,
+      popup = popup,
+      highlightOptions = leaflet::highlightOptions(
+        weight = 3,
+        fillOpacity = 0.9,
+        bringToFront = TRUE
+      )
+    ) |>
+    leaflet::addLegend(
+      position = "bottomright",
+      colors = leg_colors,
+      labels = leg_labels,
+      opacity = 0.8,
+      title = "Tipo di regione"
+    ) |>
+    leaflet::fitBounds(b$lng1, b$lat1, b$lng2, b$lat2) |>
+    htmlwidgets::onRender(js_fit)
+}

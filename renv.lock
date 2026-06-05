@@ -1113,6 +1113,13 @@
       "Maintainer": "Tyson Barrett <t.barrett88@gmail.com>",
       "Repository": "CRAN"
     },
+    "dbscan": {
+      "Package": "dbscan",
+      "Version": "1.2.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "32f87584ba32c235848599b45c4001c7"
+    },
     "digest": {
       "Package": "digest",
       "Version": "0.6.39",

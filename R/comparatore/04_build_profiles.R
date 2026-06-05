@@ -15,6 +15,7 @@
 
 source("R/comparatore/00_config_eu.R")
 library(sf)
+library(dbscan)
 
 # Asserzione di disgiunzione tra benchmark e confronto
 similarity_vars <- c(
@@ -378,30 +379,64 @@ contrib <- rbindlist(lapply(codes, function(ref) {
 }))
 dbWriteTable(con, "feature_contributions", contrib, overwrite = TRUE)
 
-# 13. Cross-check cluster (hclust + kmeans) -----
+# 13. Cluster: gruppi ward + flag outlier di densità (GLOSH) -----
 
-n_clusters <- max(4L, round(sqrt(nrow(PC) / 2)))
+# Le regioni europee formano un continuum strutturale, senza gruppi densi ben
+# separati: HDBSCAN etichetterebbe come rumore gran parte del campione. Si usa
+# quindi il clustering partizionale ward per il RAGGRUPPAMENTO in WARD_K tipi di
+# regione leggibili, e HDBSCAN solo per il punteggio di atipicità (GLOSH
+# outlier_score), che individua le regioni strutturalmente anomale
+# (capitali/città-stato, territori d'oltremare, aree artiche). Ward è
+# deterministico; kmeans (seme 42) resta come controllo di robustezza.
+cluster_k <- WARD_K
 hc <- hclust(dist(PC), method = "ward.D2")
-hc_cl <- cutree(hc, k = n_clusters)
+ward_cl <- cutree(hc, k = cluster_k)
 set.seed(42)
-km <- kmeans(PC, centers = n_clusters, nstart = 25, iter.max = 100)
+km <- kmeans(PC, centers = cluster_k, nstart = 25, iter.max = 100)
+
+minpts <- min(HDBSCAN_MINPTS, nrow(PC) - 1L)
+hdb <- dbscan::hdbscan(PC, minPts = minpts)
+outlier_score <- as.numeric(hdb$outlier_scores)
+is_outlier <- as.integer(outlier_score >= OUTLIER_THRESHOLD)
+n_outliers <- sum(is_outlier)
+
 cluster_dt <- data.table(
   NUTSCODE = codes,
-  hclust_cluster = hc_cl,
-  kmeans_cluster = km$cluster
+  cluster = as.integer(ward_cl),
+  outlier_score = outlier_score,
+  is_outlier = is_outlier,
+  membership_prob = as.numeric(hdb$membership_prob),
+  density_cluster = as.integer(hdb$cluster),
+  kmeans_cluster = as.integer(km$cluster)
 )
 dbWriteTable(con, "cluster_assignments", cluster_dt, overwrite = TRUE)
 
-# Accordo kNN vs cluster per il riferimento di default
+message(sprintf(
+  "Cluster ward: %d gruppi (dim. %s). Outlier (GLOSH>=%.2f): %d regioni (%.1f%%).",
+  cluster_k,
+  paste(sort(as.integer(table(ward_cl)), decreasing = TRUE), collapse = "/"),
+  OUTLIER_THRESHOLD,
+  n_outliers,
+  100 * n_outliers / nrow(PC)
+))
+
+# Coesione: quante delle top-4 più vicine condividono il cluster del riferimento
 ref0 <- REF_DEFAULT
 if (ref0 %in% codes) {
   top4 <- dist_long[REF_NUTSCODE == ref0 & NBR_NUTSCODE != ref0][order(rank)][
     1:4,
     NBR_NUTSCODE
   ]
-  ref_hc <- cluster_dt[NUTSCODE == ref0, hclust_cluster]
-  same_cl <- cluster_dt[NUTSCODE %in% top4, sum(hclust_cluster == ref_hc)]
-  message(sprintf("Top-4 di %s nello stesso cluster: %d/4", ref0, same_cl))
+  ref_c <- cluster_dt[NUTSCODE == ref0, cluster]
+  same_c <- cluster_dt[NUTSCODE %in% top4, sum(cluster == ref_c)]
+  message(sprintf("Top-4 di %s nello stesso cluster: %d/4", ref0, same_c))
+  if (cluster_dt[NUTSCODE == ref0, is_outlier] == 1L) {
+    message(sprintf(
+      "  Nota: %s ha struttura atipica (outlier_score %.2f)",
+      ref0,
+      cluster_dt[NUTSCODE == ref0, outlier_score]
+    ))
+  }
 }
 
 # 14. Tabelle feature (wide raw, z, long) + etichette -----
@@ -468,11 +503,33 @@ dbWriteTable(con, "feature_labels", feature_labels, overwrite = TRUE)
 # 15. Aggiorna eu_meta e salva modello PCA -----
 
 meta_new <- data.table(
-  metric = c("PCA_K", "PCA_VAR_EXPLAINED", "N_FEATURES", "N_REGIONS"),
-  value = c(k, round(100 * var_expl[k], 1), n_feat, nrow(PC))
+  metric = c(
+    "PCA_K",
+    "PCA_VAR_EXPLAINED",
+    "N_FEATURES",
+    "N_REGIONS",
+    "CLUSTER_K",
+    "HDBSCAN_MINPTS",
+    "OUTLIER_THRESHOLD",
+    "N_OUTLIERS"
+  ),
+  value = c(
+    k,
+    round(100 * var_expl[k], 1),
+    n_feat,
+    nrow(PC),
+    cluster_k,
+    minpts,
+    OUTLIER_THRESHOLD,
+    n_outliers
+  )
 )
 setnames(meta_new, "metric", "key")
-meta2 <- rbind(meta, meta_new)
+# Rimuove le chiavi gestite da questo script (incluse quelle obsolete di run
+# precedenti) prima di riscriverle: rende l'aggiornamento idempotente ed evita
+# duplicati accumulati a ogni riesecuzione.
+managed_keys <- c(meta_new$key, "N_CLUSTERS_DENSITY", "N_NOISE_DENSITY")
+meta2 <- rbind(meta[!key %in% managed_keys], meta_new)
 dbWriteTable(con, "eu_meta", meta2, overwrite = TRUE)
 
 pca_model <- list(

@@ -72,6 +72,17 @@ EU_LEVEL <- "0,2" # 2 = regioni NUTS2; 0 = aggregati paese (linee di contesto)
 EU_VERSION <- 2024
 REF_DEFAULT <- "ITC4" # Lombardia
 
+# Raggruppamento delle regioni e rilevamento outlier.
+# Le regioni europee formano un continuum strutturale (nessun gruppo denso ben
+# separato), quindi il RAGGRUPPAMENTO usa il clustering partizionale ward in
+# WARD_K tipi leggibili. HDBSCAN serve solo per il punteggio di atipicità (GLOSH
+# outlier_score): le regioni con score >= OUTLIER_THRESHOLD sono segnalate come
+# strutturalmente anomale. HDBSCAN_MINPTS è il parametro di densità del GLOSH
+# (più alto = stima più liscia); dbscan richiede minPts >= 2.
+WARD_K <- 6L
+HDBSCAN_MINPTS <- 8L
+OUTLIER_THRESHOLD <- 0.7
+
 # 3. Gruppi tematici -----
 
 thematic_groups <- list(

@@ -75,7 +75,23 @@ Metodo: standardizzazione z-score → PCA (componenti fino al 90% della varianza
 distanza euclidea nello spazio delle componenti principali (equivalente a una
 distanza di Mahalanobis denoised; pesatura empirica, nessun peso arbitrario). Le
 prime 4 regioni più vicine alla regione di riferimento sono il suggerimento
-automatico. Controllo di robustezza con clustering gerarchico e k-means.
+automatico.
+
+## Raggruppamento in tipi di regione e outlier
+
+Le regioni europee formano un **continuum strutturale**, senza gruppi densi ben
+separati: un metodo a densità (HDBSCAN) etichetterebbe come rumore gran parte del
+campione. Il raggruppamento usa quindi il **clustering partizionale ward**
+(`WARD_K = 6` gruppi, configurabile in `00_config_eu.R`) sullo spazio delle
+componenti principali, che produce tipi di regione leggibili e coesi (le 4 aree
+più simili al riferimento ricadono di norma nel suo stesso gruppo).
+
+HDBSCAN è usato per ciò in cui è efficace su questi dati: il **punteggio di
+atipicità** (GLOSH `outlier_score`). Le regioni con score ≥ `OUTLIER_THRESHOLD`
+(0,7) sono segnalate come strutturalmente anomale — tipicamente capitali e
+città-stato, territori d'oltremare, aree artiche. La tabella `cluster_assignments`
+nel DuckDB contiene `cluster` (ward), `outlier_score`, `is_outlier` e, come
+controllo di robustezza, `kmeans_cluster` e `density_cluster`.
 
 ## Dashboard
 
@@ -84,12 +100,18 @@ Due pagine (flexdashboard + Shiny):
 1. **Selezione aree** — scelta della regione di riferimento, suggerimento
    automatico delle 4 più simili (modificabile a mano o cliccando sulla mappa),
    mappa coropletica europea e classifica di similarità con le feature
-   che più contribuiscono alla distanza. In fondo, una tabella «Profilo
-   strutturale» riporta i valori delle aree selezionate per ogni variabile di
-   similarità; lo sfondo di ciascuna cella ne segnala lo scostamento dalla
-   regione di riferimento (blu = inferiore, arancio = superiore; intensità in
-   deviazioni standard), così da evidenziare a colpo d'occhio le caratteristiche
-   su cui le aree differiscono di più.
+   che più contribuiscono alla distanza. La mappa ha due modalità (selettore
+   «Colore mappa»): *Ruoli* evidenzia riferimento e aree selezionate; *Cluster*
+   colora le regioni per tipo strutturale (gruppi ward) e mostra in grigio le
+   aree atipiche (outlier). Il pulsante «Seleziona aree del cluster di …»
+   riempie il confronto con le 6 regioni più vicine appartenenti allo stesso
+   tipo del riferimento, e un value box riporta il cluster del riferimento e la
+   sua numerosità (segnalando se è strutturalmente atipico). In fondo, una
+   tabella «Profilo strutturale» riporta i valori delle aree selezionate per
+   ogni variabile di similarità; lo sfondo di ciascuna cella ne segnala lo
+   scostamento dalla regione di riferimento (blu = inferiore, arancio =
+   superiore; intensità in deviazioni standard), così da evidenziare a colpo
+   d'occhio le caratteristiche su cui le aree differiscono di più.
 2. **Confronto mercato del lavoro** — per le aree selezionate, andamento storico
    di un indicatore comparabile (regione di riferimento evidenziata), confronto a
    barre dell'ultimo anno e tabella esportabile.

@@ -643,14 +643,165 @@ run_pipeline <- function() {
     }
   }
 
+  # 6b. Rimozione invarianza spaziale LEVEL=3 vs LEVEL=2 -----
+  # Per alcune variabili ARDECO i valori NUTS3 (province) sono duplicati
+  # esatti del valore del NUTS2 padre (LEFT(NUTSCODE, 4)) per una data
+  # combinazione VARIABLE+UNIT+YEAR+SEX+AGE+SECTOR+ISCED11: falsa
+  # granularita' provinciale, non dato reale. Puo' essere strutturale
+  # (es. ROWCDH, quasi tutta la serie storica) o limitata agli ultimi
+  # anni (es. SNPCNP, solo 2025-2026: il JRC non ha ancora nowcast/
+  # proiezioni a livello di provincia e replica l'aggregato regionale
+  # su ogni provincia figlia).
+  #
+  # Regola: per ogni gruppo (VARIABLE, VERSIONS, UNIT, YEAR, SEX, AGE,
+  # SECTOR, ISCED11, NUTS2 padre) con almeno 3 righe LEVEL=3 associate,
+  # se TUTTE hanno VALUE identico (tolleranza 1e-6) al VALUE della riga
+  # LEVEL=2 padre, le righe LEVEL=3 sono duplicati e vengono rimosse.
+  # La riga LEVEL=2 non viene MAI toccata (a differenza della vecchia
+  # DELETE hardcoded su ROWCDH/EUR2020, che cancellava anche il dato
+  # regionale legittimo).
+  #
+  # Soglia minima 3 province: con 1-2 sole province una coincidenza
+  # numerica non e' escludibile; da 3 in su la probabilita' che tutte
+  # coincidano per caso e' trascurabile. Il conteggio non e' hardcoded
+  # sul numero "atteso" di province (varia da paese a paese e dipende
+  # da cfg$nutscode/cfg$level), ma calcolato dinamicamente dal COUNT(*)
+  # effettivo del gruppo.
+  #
+  # Limite noto: il controllo e' scoped a LEVEL=2 vs LEVEL=3, coerente
+  # con cfg$level = "2,3" (default). Se in futuro la pipeline scaricasse
+  # anche LEVEL=0/1, andrebbe generalizzato a ogni coppia di livelli
+  # adiacenti effettivamente presente in ardeco_data.
+
+  dbExecute(duck_con, "DROP TABLE IF EXISTS invariant_groups")
+  dbExecute(
+    duck_con,
+    "
+    CREATE TEMP TABLE invariant_groups AS
+    WITH province_parent AS (
+      SELECT
+        p.VARIABLE, p.VERSIONS, p.UNIT, p.YEAR,
+        p.SEX, p.AGE, p.SECTOR, p.ISCED11,
+        p.NUTSCODE          AS PROVINCE_NUTSCODE,
+        LEFT(p.NUTSCODE, 4) AS PARENT_NUTSCODE,
+        p.VALUE             AS PROVINCE_VALUE
+      FROM ardeco_data p
+      WHERE p.LEVEL = 3
+    ),
+    matched AS (
+      SELECT
+        pp.*,
+        (ABS(pp.PROVINCE_VALUE - r.VALUE) <= 1e-6) AS is_match
+      FROM province_parent pp
+      INNER JOIN ardeco_data r
+        ON r.LEVEL    = 2
+       AND r.VARIABLE = pp.VARIABLE
+       AND r.NUTSCODE = pp.PARENT_NUTSCODE
+       AND r.YEAR     = pp.YEAR
+       AND r.UNIT     IS NOT DISTINCT FROM pp.UNIT
+       AND r.VERSIONS IS NOT DISTINCT FROM pp.VERSIONS
+       AND r.SEX      IS NOT DISTINCT FROM pp.SEX
+       AND r.AGE      IS NOT DISTINCT FROM pp.AGE
+       AND r.SECTOR   IS NOT DISTINCT FROM pp.SECTOR
+       AND r.ISCED11  IS NOT DISTINCT FROM pp.ISCED11
+    )
+    SELECT
+      VARIABLE, VERSIONS, UNIT, YEAR, SEX, AGE, SECTOR, ISCED11,
+      PARENT_NUTSCODE,
+      COUNT(*)                                  AS n_provinces,
+      SUM(CASE WHEN is_match THEN 1 ELSE 0 END) AS n_matching
+    FROM matched
+    GROUP BY VARIABLE, VERSIONS, UNIT, YEAR, SEX, AGE, SECTOR, ISCED11,
+             PARENT_NUTSCODE
+    HAVING COUNT(*) >= 3
+       AND SUM(CASE WHEN is_match THEN 1 ELSE 0 END) = COUNT(*)
+    "
+  )
+
+  invariant_summary <- dbGetQuery(
+    duck_con,
+    "
+    SELECT VARIABLE, UNIT, MIN(YEAR) AS y0, MAX(YEAR) AS y1,
+           COUNT(DISTINCT YEAR) AS n_years,
+           SUM(n_provinces)     AS n_rows
+    FROM invariant_groups
+    GROUP BY VARIABLE, UNIT
+    ORDER BY VARIABLE, UNIT
+    "
+  )
+
+  if (nrow(invariant_summary) > 0L) {
+    for (i in seq_len(nrow(invariant_summary))) {
+      r <- invariant_summary[i, ]
+      yr_txt <- if (r$y0 == r$y1) {
+        as.character(r$y0)
+      } else {
+        sprintf("%d-%d", r$y0, r$y1)
+      }
+      log_warn(
+        "download",
+        sprintf(
+          paste0(
+            "Invarianza spaziale rilevata: %s/%s, anni %s (%d anno/i): ",
+            "%d record LEVEL=3 duplicati del NUTS2 padre saranno ",
+            "rimossi (valore LEVEL=2 preservato)"
+          ),
+          r$VARIABLE,
+          r$UNIT,
+          yr_txt,
+          r$n_years,
+          r$n_rows
+        )
+      )
+    }
+  } else {
+    log_info(
+      "download",
+      "Nessuna invarianza spaziale LEVEL=3 vs LEVEL=2 rilevata"
+    )
+  }
+
   n_del <- dbExecute(
     duck_con,
-    "DELETE FROM ardeco_data WHERE VARIABLE = 'ROWCDH' AND UNIT = 'EUR2020'"
+    "
+    DELETE FROM ardeco_data AS d
+    WHERE d.LEVEL = 3
+      AND EXISTS (
+        SELECT 1 FROM invariant_groups g
+        WHERE g.VARIABLE        = d.VARIABLE
+          AND g.PARENT_NUTSCODE = LEFT(d.NUTSCODE, 4)
+          AND g.YEAR            = d.YEAR
+          AND g.UNIT            IS NOT DISTINCT FROM d.UNIT
+          AND g.VERSIONS        IS NOT DISTINCT FROM d.VERSIONS
+          AND g.SEX             IS NOT DISTINCT FROM d.SEX
+          AND g.AGE             IS NOT DISTINCT FROM d.AGE
+          AND g.SECTOR          IS NOT DISTINCT FROM d.SECTOR
+          AND g.ISCED11         IS NOT DISTINCT FROM d.ISCED11
+      )
+    "
   )
   log_info(
     "download",
-    sprintf("Rimossi %d record invarianti (ROWCDH EUR2020)", n_del)
+    sprintf(
+      "Rimossi %d record invarianti LEVEL=3 (duplicati del NUTS2 padre)",
+      n_del
+    )
   )
+  if (
+    nrow(invariant_summary) > 0L &&
+      n_del != sum(invariant_summary$n_rows)
+  ) {
+    log_warn(
+      "download",
+      sprintf(
+        "Discrepanza conteggio invarianza: attesi %d record, rimossi %d",
+        sum(invariant_summary$n_rows),
+        n_del
+      )
+    )
+  }
+
+  dbExecute(duck_con, "DROP TABLE IF EXISTS invariant_groups")
 
   dbExecute(duck_con, "CREATE INDEX idx_variable ON ardeco_data (VARIABLE)")
   dbExecute(

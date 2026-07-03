@@ -201,6 +201,10 @@ var_labels <- data.table(
     "RNLHW",
     "RPECNP",
     "RPUCNP",
+    "ZINACT15",
+    "ZTINACT15",
+    "ZNOCC2064",
+    "ZTNOCC2064",
     "SNETZ",
     "RNLHZ",
     "SUVGD",
@@ -260,6 +264,10 @@ var_labels <- data.table(
     "Ore lavorate (dipendenti)",
     "Tasso di occupazione (20-64 anni)",
     "Tasso di disoccupazione (15-74 anni)",
+    "Popolazione inattiva 15+ (indicatore calcolato, non ARDECO)",
+    "Tasso di inattività 15+ (indicatore calcolato, non ARDECO)",
+    "Popolazione non occupata 20-64 anni (indicatore calcolato: disoccupati e inattivi, non tasso di inattività)",
+    "Tasso di non occupazione 20-64 anni (indicatore calcolato, non tasso di inattività)",
     "Occupazione per settore NACE",
     "Ore lavorate per settore NACE",
     "PIL a prezzi correnti",
@@ -297,7 +305,7 @@ var_labels <- data.table(
   ),
   group_id = c(
     rep("popolazione_demografia", 12),
-    rep("mercato_lavoro", 11),
+    rep("mercato_lavoro", 15),
     rep("occupazione_settore", 2),
     rep("pil_valore_aggiunto", 14),
     rep("reddito_compensi", 9),
@@ -440,7 +448,8 @@ sector_labels <- data.table(
     "M_N",
     "O-Q",
     "O-U",
-    "R-U"
+    "R-U",
+    "TOTAL"
   ),
   label_it = c(
     "Agricoltura, silvicoltura e pesca",
@@ -455,7 +464,8 @@ sector_labels <- data.table(
     "Attivit\u00e0 professionali, scientifiche e tecniche",
     "PA, istruzione, sanit\u00e0",
     "PA, istruzione, sanit\u00e0 e altri servizi",
-    "Altre attivit\u00e0 di servizi"
+    "Altre attivit\u00e0 di servizi",
+    "Totale (tutti i settori)"
   )
 )
 
@@ -643,6 +653,369 @@ run_pipeline <- function() {
     }
   }
 
+  # 6a2. Calcolo indicatori derivati (inattivita') -----
+  # Codici sintetici (prefisso Z, mai usato da ARDECO - verificato via
+  # ardeco_get_variable_list() sui 101 codici live) calcolati localmente
+  # da SNPTN/RNLCN/RNECN gia' presenti in ardeco_data. Vanno PRIMA della
+  # rimozione invarianza spaziale (6b) cosi' che il controllo generico
+  # gia' esistente ripulisca automaticamente anche queste righe, senza
+  # codice dedicato.
+  #
+  # Indicatore 1 - Popolazione inattiva (15+), definizione ILO/Eurostat:
+  #   Popolazione(15+)   = SNPTN[AGE=TOTAL] - SNPTN[AGE=Y_LT15]  (SEX=TOTAL, UNIT=NR -> /1000 = THS)
+  #   Forza lavoro(15+)  = RNLCN (SEX/AGE NULL, UNIT=THS, gia' scoped 15+)
+  #   Inattiva(15+)      = Popolazione(15+) - Forza lavoro(15+)
+  #   Tasso inattivita'  = Inattiva(15+) / Popolazione(15+) * 100
+  #
+  # Indicatore 2 - Popolazione NON occupata (20-64): NON e' inattivita'
+  # vera (disoccupati+inattivi confusi insieme), perche' RNUTN non ha
+  # breakdown per eta'. Etichettato in modo esplicito per non confondere
+  # con l'indicatore 1.
+  #   Popolazione(20-64) = SNPTN[AGE=Y20-64, SEX=TOTAL] (UNIT=NR -> /1000 = THS)
+  #   Occupati(20-64)    = RNECN[AGE=Y20-64, SEX=TOTAL] (UNIT=THS)
+  #   Non occupata       = Popolazione(20-64) - Occupati(20-64)
+  #   Tasso non occ.     = Non occupata / Popolazione(20-64) * 100
+
+  log_step(
+    "derive",
+    "Calcolo indicatori derivati (inattivita' 15+, non occupazione 20-64)"
+  )
+
+  n_pop_tot <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='SNPTN' AND UNIT='NR' AND SEX='TOTAL' AND AGE='TOTAL'"
+  )$n
+  n_pop_lt15 <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='SNPTN' AND UNIT='NR' AND SEX='TOTAL' AND AGE='Y_LT15'"
+  )$n
+  n_lf15 <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='RNLCN' AND UNIT='THS' AND SEX IS NULL AND AGE IS NULL"
+  )$n
+  n_pop2064 <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='SNPTN' AND UNIT='NR' AND SEX='TOTAL' AND AGE='Y20-64'"
+  )$n
+  n_emp2064 <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='RNECN' AND UNIT='THS' AND SEX='TOTAL' AND AGE='Y20-64'"
+  )$n
+
+  log_info(
+    "derive",
+    sprintf(
+      "Slice sorgenti: SNPTN[TOTAL]=%d SNPTN[Y_LT15]=%d RNLCN=%d SNPTN[Y20-64]=%d RNECN[Y20-64]=%d",
+      n_pop_tot,
+      n_pop_lt15,
+      n_lf15,
+      n_pop2064,
+      n_emp2064
+    )
+  )
+
+  # -- indicatore 1: inattivita' 15+ -------------------------------------
+  dbExecute(duck_con, "DROP TABLE IF EXISTS calc_inact15")
+  dbExecute(
+    duck_con,
+    "
+    CREATE TEMP TABLE calc_inact15 AS
+    WITH pop_total AS (
+      SELECT NUTSCODE, YEAR, LEVEL, VERSIONS, VALUE AS POP_TOTAL_NR
+      FROM ardeco_data
+      WHERE VARIABLE = 'SNPTN' AND UNIT = 'NR' AND SEX = 'TOTAL' AND AGE = 'TOTAL'
+    ),
+    pop_lt15 AS (
+      SELECT NUTSCODE, YEAR, LEVEL, VERSIONS, VALUE AS POP_LT15_NR
+      FROM ardeco_data
+      WHERE VARIABLE = 'SNPTN' AND UNIT = 'NR' AND SEX = 'TOTAL' AND AGE = 'Y_LT15'
+    ),
+    labour_force AS (
+      SELECT NUTSCODE, YEAR, LEVEL, VERSIONS, VALUE AS LF15_THS
+      FROM ardeco_data
+      WHERE VARIABLE = 'RNLCN' AND UNIT = 'THS' AND SEX IS NULL AND AGE IS NULL
+    ),
+    pop15 AS (
+      SELECT t.NUTSCODE, t.YEAR, t.LEVEL, t.VERSIONS,
+             (t.POP_TOTAL_NR - l.POP_LT15_NR) / 1000.0 AS POP15_THS
+      FROM pop_total t
+      INNER JOIN pop_lt15 l
+        ON l.NUTSCODE = t.NUTSCODE AND l.YEAR = t.YEAR AND l.LEVEL = t.LEVEL
+       AND l.VERSIONS IS NOT DISTINCT FROM t.VERSIONS
+    )
+    SELECT p.NUTSCODE, p.YEAR, p.LEVEL, p.VERSIONS,
+           p.POP15_THS,
+           f.LF15_THS,
+           (p.POP15_THS - f.LF15_THS)                     AS INACT15_THS,
+           (p.POP15_THS - f.LF15_THS) / p.POP15_THS * 100  AS INACT15_RATE
+    FROM pop15 p
+    INNER JOIN labour_force f
+      ON f.NUTSCODE = p.NUTSCODE AND f.YEAR = p.YEAR AND f.LEVEL = p.LEVEL
+     AND f.VERSIONS IS NOT DISTINCT FROM p.VERSIONS
+    "
+  )
+
+  n_inact15 <- dbGetQuery(duck_con, "SELECT COUNT(*) n FROM calc_inact15")$n
+  if (n_inact15 < 0.95 * min(n_pop_tot, n_pop_lt15, n_lf15)) {
+    log_warn(
+      "derive",
+      sprintf(
+        paste0(
+          "ZINACT15: solo %d righe calcolate a fronte di un input piu' ",
+          "scarso di %d righe (RNLCN) - possibile mismatch di chiavi"
+        ),
+        n_inact15,
+        n_lf15
+      )
+    )
+  } else {
+    log_info(
+      "derive",
+      sprintf("ZINACT15/ZTINACT15: %d righe calcolate", n_inact15)
+    )
+  }
+
+  dbExecute(
+    duck_con,
+    "
+    INSERT INTO ardeco_data
+      (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+    SELECT 'ZINACT15', VERSIONS, LEVEL, NUTSCODE, YEAR, 'THS', INACT15_THS,
+           'TOTAL', 'Y_GE15', NULL, NULL, 'mercato_lavoro'
+    FROM calc_inact15
+    "
+  )
+  dbExecute(
+    duck_con,
+    "
+    INSERT INTO ardeco_data
+      (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+    SELECT 'ZTINACT15', VERSIONS, LEVEL, NUTSCODE, YEAR, 'PC', INACT15_RATE,
+           'TOTAL', 'Y_GE15', NULL, NULL, 'mercato_lavoro'
+    FROM calc_inact15
+    "
+  )
+
+  n_neg <- dbGetQuery(
+    duck_con,
+    "SELECT COUNT(*) n FROM ardeco_data WHERE VARIABLE='ZINACT15' AND VALUE < 0"
+  )$n
+  if (n_neg > 0L) {
+    log_warn(
+      "derive",
+      sprintf(
+        "ZINACT15: %d righe con valore negativo (anomalia dati sorgente?)",
+        n_neg
+      )
+    )
+  }
+  dbExecute(duck_con, "DROP TABLE IF EXISTS calc_inact15")
+
+  # -- indicatore 2: non occupazione 20-64 -------------------------------
+  dbExecute(duck_con, "DROP TABLE IF EXISTS calc_nocc2064")
+  dbExecute(
+    duck_con,
+    "
+    CREATE TEMP TABLE calc_nocc2064 AS
+    WITH pop2064 AS (
+      SELECT NUTSCODE, YEAR, LEVEL, VERSIONS, VALUE / 1000.0 AS POP2064_THS
+      FROM ardeco_data
+      WHERE VARIABLE = 'SNPTN' AND UNIT = 'NR' AND SEX = 'TOTAL' AND AGE = 'Y20-64'
+    ),
+    emp2064 AS (
+      SELECT NUTSCODE, YEAR, LEVEL, VERSIONS, VALUE AS EMP2064_THS
+      FROM ardeco_data
+      WHERE VARIABLE = 'RNECN' AND UNIT = 'THS' AND SEX = 'TOTAL' AND AGE = 'Y20-64'
+    )
+    SELECT p.NUTSCODE, p.YEAR, p.LEVEL, p.VERSIONS,
+           p.POP2064_THS,
+           e.EMP2064_THS,
+           (p.POP2064_THS - e.EMP2064_THS)                     AS NOCC2064_THS,
+           (p.POP2064_THS - e.EMP2064_THS) / p.POP2064_THS * 100 AS NOCC2064_RATE
+    FROM pop2064 p
+    INNER JOIN emp2064 e
+      ON e.NUTSCODE = p.NUTSCODE AND e.YEAR = p.YEAR AND e.LEVEL = p.LEVEL
+     AND e.VERSIONS IS NOT DISTINCT FROM p.VERSIONS
+    "
+  )
+
+  n_nocc2064 <- dbGetQuery(duck_con, "SELECT COUNT(*) n FROM calc_nocc2064")$n
+  if (n_nocc2064 < 0.95 * min(n_pop2064, n_emp2064)) {
+    log_warn(
+      "derive",
+      sprintf(
+        paste0(
+          "ZNOCC2064: solo %d righe calcolate a fronte di un input piu' ",
+          "scarso di %d righe - possibile mismatch di chiavi"
+        ),
+        n_nocc2064,
+        min(n_pop2064, n_emp2064)
+      )
+    )
+  } else {
+    log_info(
+      "derive",
+      sprintf("ZNOCC2064/ZTNOCC2064: %d righe calcolate", n_nocc2064)
+    )
+  }
+
+  dbExecute(
+    duck_con,
+    "
+    INSERT INTO ardeco_data
+      (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+    SELECT 'ZNOCC2064', VERSIONS, LEVEL, NUTSCODE, YEAR, 'THS', NOCC2064_THS,
+           'TOTAL', 'Y20-64', NULL, NULL, 'mercato_lavoro'
+    FROM calc_nocc2064
+    "
+  )
+  dbExecute(
+    duck_con,
+    "
+    INSERT INTO ardeco_data
+      (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+    SELECT 'ZTNOCC2064', VERSIONS, LEVEL, NUTSCODE, YEAR, 'PC', NOCC2064_RATE,
+           'TOTAL', 'Y20-64', NULL, NULL, 'mercato_lavoro'
+    FROM calc_nocc2064
+    "
+  )
+  dbExecute(duck_con, "DROP TABLE IF EXISTS calc_nocc2064")
+
+  # -- registrazione sintetica in download_log per visibilita' operativa -
+  derived_log <- data.table(
+    var_code = c("ZINACT15", "ZTINACT15", "ZNOCC2064", "ZTNOCC2064"),
+    group = "mercato_lavoro",
+    n_rows = as.integer(c(n_inact15, n_inact15, n_nocc2064, n_nocc2064)),
+    status = "DERIVED",
+    elapsed_sec = 0
+  )
+  summary_log <- rbindlist(list(summary_log, derived_log), use.names = TRUE)
+  log_info(
+    "derive",
+    sprintf(
+      "Indicatori derivati: %d righe totali aggiunte a download_log",
+      nrow(derived_log)
+    )
+  )
+
+  # 6a3. Duplicazione totale settoriale (SECTOR='TOTAL') -----
+  # 10 variabili scaricano solo la ripartizione NACE (SECTOR = 13 codici,
+  # senza aggregato "tutti i settori" nella propria serie). Il totale
+  # esiste gia', pubblicato sotto un nome diverso (la variabile "sibling"
+  # non scomposta per settore). Verificato live (ITC4, versione 2024):
+  # sommare i 10 settori del partizionamento standard ESA/Eurostat
+  # (A, B-E, F, G-I, J, K, L, M_N, O-Q, R-U) NON riproduce sempre il
+  # sibling: coincide esattamente per le variabili nominali, ma diverge
+  # (fino a diversi punti percentuali) per SUKCZ (residuo non allocato)
+  # e per le 4 variabili a prezzi costanti/volume concatenato (non
+  # additivita' dei volumi concatenati, fenomeno noto Eurostat/OCSE, non
+  # un errore). Percio' il totale NON viene calcolato per somma: viene
+  # COPIATO cosi' com'e' dalla riga del sibling, garantendo coerenza
+  # byte-per-byte con il dato gia' pubblicato altrove. Va PRIMA di 6b
+  # cosi' che il controllo generico di invarianza spaziale copra anche
+  # queste righe, per lo stesso motivo di 6a2.
+  #
+  # THEMATIC_GROUP: NON viene copiato dal sibling (per SNETZ/RNLHZ il
+  # sibling appartiene a un gruppo tematico diverso, "mercato_lavoro",
+  # mentre SNETZ/RNLHZ appartengono a "occupazione_settore" - vedi
+  # thematic_groups) - si usa invece var_to_group[[zv]], cosi' le nuove
+  # righe SECTOR='TOTAL' restano coerenti con le altre righe della
+  # stessa variabile Z.
+
+  log_step(
+    "derive",
+    "Duplicazione totale settoriale (SECTOR='TOTAL') per variabili NACE"
+  )
+
+  sector_total_pairs <- data.table(
+    z_var = c(
+      "SNETZ",
+      "RNLHZ",
+      "SUVGZ",
+      "SOVGZ",
+      "RUWCZ",
+      "ROWCZ",
+      "RUIGZ",
+      "ROIGZ",
+      "SUKCZ",
+      "SOKCZ"
+    ),
+    total_var = c(
+      "SNETD",
+      "RNLHT",
+      "SUVGE",
+      "SOVGE",
+      "RUWCD",
+      "ROWCD",
+      "RUIGT",
+      "ROIGT",
+      "SUKCT",
+      "SOKCT"
+    )
+  )
+
+  for (i in seq_len(nrow(sector_total_pairs))) {
+    zv <- sector_total_pairs$z_var[i]
+    tv <- sector_total_pairs$total_var[i]
+    tg <- var_to_group[[zv]]
+
+    n_sibling <- dbGetQuery(
+      duck_con,
+      sprintf("SELECT COUNT(*) AS n FROM ardeco_data WHERE VARIABLE = '%s'", tv)
+    )$n
+
+    dbExecute(
+      duck_con,
+      sprintf(
+        "
+        INSERT INTO ardeco_data
+          (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+        SELECT '%s', VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, 'TOTAL', ISCED11, '%s'
+        FROM ardeco_data
+        WHERE VARIABLE = '%s'
+        ",
+        zv,
+        tg,
+        tv
+      )
+    )
+
+    n_copied <- dbGetQuery(
+      duck_con,
+      sprintf(
+        "SELECT COUNT(*) AS n FROM ardeco_data WHERE VARIABLE = '%s' AND SECTOR = 'TOTAL'",
+        zv
+      )
+    )$n
+
+    if (n_copied != n_sibling) {
+      log_warn(
+        "derive",
+        sprintf(
+          paste0(
+            "%s<-%s: righe copiate (%d) diverse dalle righe sorgente (%d) - ",
+            "possibile problema di allineamento NUTSCODE/YEAR/LEVEL/VERSIONS/UNIT"
+          ),
+          zv,
+          tv,
+          n_copied,
+          n_sibling
+        )
+      )
+    } else {
+      log_info(
+        "derive",
+        sprintf(
+          "%s: aggiunte %d righe SECTOR='TOTAL' copiate da %s (gruppo %s)",
+          zv,
+          n_copied,
+          tv,
+          tg
+        )
+      )
+    }
+  }
+
   # 6b. Rimozione invarianza spaziale LEVEL=3 vs LEVEL=2 -----
   # Per alcune variabili ARDECO i valori NUTS3 (province) sono duplicati
   # esatti del valore del NUTS2 padre (LEFT(NUTSCODE, 4)) per una data
@@ -826,7 +1199,7 @@ run_pipeline <- function() {
       "Totali: %d OK, %d FAILED su %d variabili (%.0fs)",
       n_ok,
       n_failed,
-      nrow(summary_log),
+      length(all_vars),
       total_elapsed
     )
   )

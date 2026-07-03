@@ -99,6 +99,104 @@ for (i in seq_along(all_vars)) {
   set(summary_log, i, "elapsed_sec", elapsed)
 }
 
+# Duplicazione totale settoriale (SECTOR='TOTAL') -----
+# 10 variabili scaricano solo la ripartizione NACE (SECTOR = 13 codici,
+# senza aggregato "tutti i settori" nella propria serie). Il totale
+# esiste gia', pubblicato sotto un nome diverso (la variabile "sibling"
+# non scomposta per settore). Verificato live (ITC4, versione 2024) in
+# R/run_pipeline.R: sommare i 10 settori del partizionamento standard
+# ESA/Eurostat (A, B-E, F, G-I, J, K, L, M_N, O-Q, R-U) NON riproduce
+# sempre il sibling: coincide esattamente per le variabili nominali, ma
+# diverge (fino a diversi punti percentuali) per SUKCZ (residuo non
+# allocato) e per le variabili a prezzi costanti/volume concatenato
+# (non additivita' dei volumi concatenati, fenomeno noto Eurostat/OCSE,
+# non un errore). Percio' il totale NON viene calcolato per somma: viene
+# COPIATO cosi' com'e' dalla riga del sibling.
+#
+# THEMATIC_GROUP: NON viene copiato dal sibling (per SNETZ/RNLHZ il
+# sibling appartiene a "mercato_lavoro", mentre SNETZ/RNLHZ appartengono
+# a "occupazione_settore") - si usa invece var_to_group[[zv]].
+
+sector_total_pairs <- data.table(
+  z_var = c(
+    "SNETZ",
+    "RNLHZ",
+    "SUVGZ",
+    "SOVGZ",
+    "RUWCZ",
+    "ROWCZ",
+    "RUIGZ",
+    "ROIGZ",
+    "SUKCZ",
+    "SOKCZ"
+  ),
+  total_var = c(
+    "SNETD",
+    "RNLHT",
+    "SUVGE",
+    "SOVGE",
+    "RUWCD",
+    "ROWCD",
+    "RUIGT",
+    "ROIGT",
+    "SUKCT",
+    "SOKCT"
+  )
+)
+
+for (i in seq_len(nrow(sector_total_pairs))) {
+  zv <- sector_total_pairs$z_var[i]
+  tv <- sector_total_pairs$total_var[i]
+  tg <- var_to_group[[zv]]
+
+  n_sibling <- dbGetQuery(
+    con,
+    sprintf("SELECT COUNT(*) AS n FROM ardeco_data WHERE VARIABLE = '%s'", tv)
+  )$n
+
+  dbExecute(
+    con,
+    sprintf(
+      "
+      INSERT INTO ardeco_data
+        (VARIABLE, VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, SECTOR, ISCED11, THEMATIC_GROUP)
+      SELECT '%s', VERSIONS, LEVEL, NUTSCODE, YEAR, UNIT, VALUE, SEX, AGE, 'TOTAL', ISCED11, '%s'
+      FROM ardeco_data
+      WHERE VARIABLE = '%s'
+      ",
+      zv,
+      tg,
+      tv
+    )
+  )
+
+  n_copied <- dbGetQuery(
+    con,
+    sprintf(
+      "SELECT COUNT(*) AS n FROM ardeco_data WHERE VARIABLE = '%s' AND SECTOR = 'TOTAL'",
+      zv
+    )
+  )$n
+
+  if (n_copied != n_sibling) {
+    message(sprintf(
+      "ATTENZIONE %s<-%s: righe copiate (%d) diverse dalle righe sorgente (%d)",
+      zv,
+      tv,
+      n_copied,
+      n_sibling
+    ))
+  } else {
+    message(sprintf(
+      "%s: aggiunte %d righe SECTOR='TOTAL' copiate da %s (gruppo %s)",
+      zv,
+      n_copied,
+      tv,
+      tg
+    ))
+  }
+}
+
 # Rimozione combinazioni invarianti tra territori (coerente con produzione)
 n_del <- dbExecute(
   con,

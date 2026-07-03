@@ -433,7 +433,8 @@ sector_labels <- data.table(
     "M_N",
     "O-Q",
     "O-U",
-    "R-U"
+    "R-U",
+    "TOTAL"
   ),
   label_it = c(
     "Agricoltura, silvicoltura e pesca",
@@ -448,7 +449,8 @@ sector_labels <- data.table(
     "Attività professionali, scientifiche e tecniche",
     "PA, istruzione, sanità",
     "PA, istruzione, sanità e altri servizi",
-    "Altre attività di servizi"
+    "Altre attività di servizi",
+    "Totale (tutti i settori)"
   )
 )
 

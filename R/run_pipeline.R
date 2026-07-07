@@ -490,7 +490,7 @@ group_labels <- data.table(
 
 # 5. Download da ARDECO -----
 
-download_variable <- function(var_code, nutscode, level, version, timeout_sec) {
+download_attempt <- function(var_code, nutscode, level, version, timeout_sec) {
   tryCatch(
     {
       dl <- R.utils::withTimeout(
@@ -503,10 +503,49 @@ download_variable <- function(var_code, nutscode, level, version, timeout_sec) {
         timeout = timeout_sec
       )
       if (is.null(dl) || nrow(dl) == 0L) {
-        log_warn("download", sprintf("%s: nessun dato restituito", var_code))
-        return(NULL)
+        list(ok = FALSE, reason = "nessun dato restituito")
+      } else {
+        list(ok = TRUE, data = dl)
       }
-      dt <- as.data.table(dl)
+    },
+    TimeoutException = function(e) {
+      list(ok = FALSE, reason = sprintf("timeout dopo %ds", timeout_sec))
+    },
+    error = function(e) {
+      list(ok = FALSE, reason = sprintf("errore: %s", conditionMessage(e)))
+    }
+  )
+}
+
+# Backoff: tentativo 1 immediato, tentativo 2 dopo 5-10s (jitter), tentativo 3
+# dopo 1 minuto - assorbe i blip transitori dell'API JRC senza perdere la
+# variabile dallo schema di produzione (vedi log FAILED del 2026-07-07:
+# 12 variabili segnalate FAILED erano in realta' tutte scaricabili subito
+# dopo, a conferma di un problema di rete/API transitorio, non di dati
+# mancanti).
+download_variable <- function(var_code, nutscode, level, version, timeout_sec) {
+  delays <- c(0, stats::runif(1, min = 5, max = 10), 60)
+  n_attempts <- length(delays)
+
+  for (attempt in seq_len(n_attempts)) {
+    if (delays[attempt] > 0) {
+      log_warn(
+        "download",
+        sprintf(
+          "%s: nuovo tentativo %d/%d tra %.1fs",
+          var_code,
+          attempt,
+          n_attempts,
+          delays[attempt]
+        )
+      )
+      Sys.sleep(delays[attempt])
+    }
+
+    res <- download_attempt(var_code, nutscode, level, version, timeout_sec)
+
+    if (isTRUE(res$ok)) {
+      dt <- as.data.table(res$data)
 
       for (col in c("SEX", "AGE", "SECTOR", "ISCED11")) {
         if (!col %in% names(dt)) set(dt, j = col, value = NA_character_)
@@ -526,7 +565,7 @@ download_variable <- function(var_code, nutscode, level, version, timeout_sec) {
         set(dt, j = "VERSIONS", value = as.integer(dt[["VERSIONS"]]))
       }
 
-      dt[, list(
+      return(dt[, list(
         VARIABLE,
         VERSIONS,
         LEVEL,
@@ -539,23 +578,28 @@ download_variable <- function(var_code, nutscode, level, version, timeout_sec) {
         SECTOR,
         ISCED11,
         THEMATIC_GROUP
-      )]
-    },
-    TimeoutException = function(e) {
-      log_warn(
-        "download",
-        sprintf("%s: timeout dopo %ds", var_code, timeout_sec)
-      )
-      NULL
-    },
-    error = function(e) {
-      log_warn(
-        "download",
-        sprintf("%s: errore: %s", var_code, conditionMessage(e))
-      )
-      NULL
+      )])
     }
-  )
+
+    esito <- if (attempt == n_attempts) {
+      "abbandono"
+    } else {
+      "nuovo tentativo in arrivo"
+    }
+    log_warn(
+      "download",
+      sprintf(
+        "%s: %s (tentativo %d/%d, %s)",
+        var_code,
+        res$reason,
+        attempt,
+        n_attempts,
+        esito
+      )
+    )
+  }
+
+  NULL
 }
 
 # 6. Costruzione DuckDB di staging -----

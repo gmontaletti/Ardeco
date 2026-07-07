@@ -1314,11 +1314,22 @@ run_pipeline <- function() {
     }
   }
 
+  # Soglia di sicurezza: anche una sola variabile fallita dopo tutti i
+  # tentativi di retry (vedi download_variable) blocca la pipeline prima
+  # dello swap in produzione. Un fallimento a questo punto non e' piu'
+  # un blip transitorio (gia' assorbito dal retry), quindi non va
+  # propagato silenziosamente allo schema PostgreSQL di produzione.
   if (n_failed > 0L) {
     failed_vars <- summary_log[status == "FAILED", var_code]
-    log_warn(
+    dbDisconnect(duck_con, shutdown = TRUE)
+    fatal(
       "verify",
-      sprintf("Variabili fallite: %s", paste(failed_vars, collapse = ", "))
+      sprintf(
+        "%d/%d variabili non scaricate dopo tutti i tentativi di retry: %s. Swap in produzione annullato.",
+        n_failed,
+        length(all_vars),
+        paste(failed_vars, collapse = ", ")
+      )
     )
   }
 

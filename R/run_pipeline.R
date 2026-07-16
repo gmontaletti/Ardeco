@@ -176,6 +176,12 @@ for (gn in names(thematic_groups)) {
 }
 all_vars <- unique(unlist(thematic_groups, use.names = FALSE))
 
+# TODO: questa copia di var_labels non ha description_it (gap preesistente
+# rispetto a R/01_build_duckdb.R). reference/var_labels_help_it.csv contiene
+# una bozza della colonna help_it: da integrare qui insieme a description_it
+# quando si decide di allineare questa pipeline (eseguita nel container
+# Docker) allo schema completo di var_labels.
+
 var_labels <- data.table(
   var_code = c(
     "SNPTD",

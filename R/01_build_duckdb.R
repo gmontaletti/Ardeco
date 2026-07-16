@@ -105,6 +105,10 @@ all_vars <- unique(unlist(thematic_groups, use.names = FALSE))
 
 # 4. Tabelle etichette -----
 
+# TODO: reference/var_labels_help_it.csv contiene una bozza della colonna
+# help_it (spiegazione approfondita + lettura del valore) da unire per
+# var_code a var_labels quando si decide di integrarla in questa pipeline.
+
 var_labels <- data.table(
   var_code = c(
     "SNPTD",

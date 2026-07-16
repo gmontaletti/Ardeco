@@ -8,19 +8,6 @@ Research and documentation project for working with the **ARDECO** (Annual Regio
 
 This is **not** an R package — it is an RStudio project containing exploration scripts and technical documentation for the ARDECO CRAN package.
 
-## Key Files
-
-- `ARDECO_nota_tecnica.md` — comprehensive Italian-language technical documentation covering ARDECO's thematic domains, API functions, filtering options, batch downloads, and targets pipeline integration
-- `00_test.R` — demonstration script showing ARDECO package workflow (variable exploration, data download with filters)
-
-## ARDECO Package API (from CRAN)
-
-Four main functions:
-- `ardeco_get_variable_list()` — list available variables
-- `ardeco_get_tercet_list()` — territorial typologies
-- `ardeco_get_dataset_list()` — dataset metadata
-- `ardeco_get_dataset_data()` — download data with filters (nutscode, level, unit, version, year)
-
 ## Conventions
 
 - R script sections use `# 1. section name -----` format (no `####`-only rows)
